@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Inloggen · Kerssing Trein{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <p class="eyebrow">Treindiensten</p>
+  <h1>Inloggen</h1>
+  <p class="muted">Registratie van diensten, dienstlijsten en European Instructions.</p>
+  <form method="post" class="stack" data-submit-lock>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Gebruikersnaam
+      <input type="text" name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Wachtwoord
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button class="button primary large" type="submit" data-saving-text="Inloggen…">Inloggen</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,11 @@
+services:
+  trein:
+    build: .
+    container_name: kerssing-trein
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "127.0.0.1:8089:8000"

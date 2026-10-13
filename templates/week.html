@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Week {{ iso_week }} · Kerssing Trein{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Treindiensten</p>
+    <h1>Week {{ iso_week }} · {{ iso_year }}</h1>
+    <p class="muted">{{ monday.strftime('%d-%m-%Y') }} t/m {{ sunday.strftime('%d-%m-%Y') }}</p>
+  </div>
+</section>
+
+<nav class="week-nav" aria-label="Weeknavigatie">
+  <a href="{{ url_for('week', year=prev_year, week=prev_week) }}">← Week {{ prev_week }}</a>
+  <a href="{{ url_for('week') }}">Huidige week</a>
+  <a href="{{ url_for('week', year=next_year, week=next_week) }}">Week {{ next_week }} →</a>
+</nav>
+
+<section class="day-list">
+  {% for item in days %}
+  <a class="day-card" href="{{ url_for('day', service_date=item.date.isoformat()) }}">
+    <div class="day-name">
+      <strong>{{ DUTCH_DAYS[item.date.weekday()]|capitalize }}</strong>
+      <span class="date">{{ item.date.strftime('%d-%m-%Y') }}</span>
+    </div>
+    {% if item.row %}
+      <div class="day-details">
+        <span class="service-number">Dienst {{ item.row['service_number'] or '—' }}</span>
+        <span>{{ item.row['start_time'] or '—' }} – {{ item.row['end_time'] or '—' }}</span>
+        <span>Uitloop {{ format_minutes(item.row['overrun_minutes']) }}</span>
+        <span>{{ item.row['attachment_count'] }} bestand{% if item.row['attachment_count'] != 1 %}en{% endif %}</span>
+      </div>
+      <div class="worked">{{ format_minutes(item.duty_minutes) }}</div>
+    {% else %}
+      <div class="day-details muted">Nog niet ingevuld</div>
+      <div class="worked muted">—</div>
+    {% endif %}
+  </a>
+  {% endfor %}
+</section>
+
+<section class="summary-grid">
+  <div class="metric-card"><span>Totaal diensttijd</span><strong>{{ format_minutes(total_minutes) }}</strong></div>
+  <div class="metric-card"><span>Totaal uitloop</span><strong>{{ format_minutes(total_overrun) }}</strong></div>
+</section>
+{% endblock %}

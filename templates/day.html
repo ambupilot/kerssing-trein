@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ DUTCH_DAYS[d.weekday()]|capitalize }} {{ d.strftime('%d-%m-%Y') }} · Kerssing Trein{% endblock %}
+{% block content %}
+{% set iso = d.isocalendar() %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Dagstaat trein</p>
+    <h1>{{ DUTCH_DAYS[d.weekday()]|capitalize }}</h1>
+    <p class="muted">{{ d.strftime('%d-%m-%Y') }} · week {{ iso.week }}</p>
+  </div>
+  <a class="button secondary" href="{{ url_for('week', year=iso.year, week=iso.week) }}">Terug naar week</a>
+</section>
+
+<form method="post" class="stack" id="duty-form" data-draft-form data-draft-key="kerssing-trein:{{ d.isoformat() }}" data-submit-lock>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="card stack">
+    <div class="field-grid">
+      <label>Dienstnummer
+        <input type="text" name="service_number" value="{{ row['service_number'] if row else '' }}" inputmode="numeric" autocomplete="off" placeholder="Bijv. 12345">
+      </label>
+      <label>Begintijd dienst
+        <input type="time" name="start_time" value="{{ row['start_time'] if row and row['start_time'] else '' }}">
+      </label>
+      <label>Eindtijd dienst
+        <input type="time" name="end_time" value="{{ row['end_time'] if row and row['end_time'] else '' }}">
+      </label>
+      <label>Uitloop in minuten
+        <input type="number" name="overrun_minutes" min="0" step="1" value="{{ row['overrun_minutes'] if row else 0 }}" inputmode="numeric">
+      </label>
+    </div>
+    <label>Notitie
+      <textarea name="notes" rows="4" placeholder="Optioneel">{{ row['notes'] if row else '' }}</textarea>
+    </label>
+    <div class="worked-summary"><span>Diensttijd</span><strong>{{ format_minutes(duty_minutes) }}</strong></div>
+  </section>
+  <button class="button primary large" type="submit" data-saving-text="Opslaan…">Dag opslaan</button>
+  <p class="draft-status muted" data-draft-status></p>
+</form>
+
+<section class="card stack upload-section">
+  <div>
+    <h2>Dienstlijst</h2>
+    <p class="muted">Maak een foto, kies een foto uit de bibliotheek of selecteer een bestand. Meerdere bestanden tegelijk zijn mogelijk.</p>
+  </div>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('upload_files', service_date=d.isoformat(), category='dienstlijst') }}" class="stack" data-submit-lock>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="upload-box"><span>Foto / bestand toevoegen</span>
+      <input type="file" name="attachments" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf" multiple required>
+    </label>
+    <button class="button secondary" type="submit" data-saving-text="Uploaden…">Upload dienstlijst</button>
+  </form>
+  {% if attachments['dienstlijst'] %}
+  <div class="attachments">
+    {% for item in attachments['dienstlijst'] %}
+    <div class="attachment-row">
+      <a href="{{ url_for('attachment', attachment_id=item.row['id']) }}" target="_blank" rel="noopener">{{ item.label }} · {{ item.display_time }}</a>
+      <form method="post" action="{{ url_for('delete_attachment', attachment_id=item.row['id']) }}" data-submit-lock>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="danger-link" type="submit" onclick="return confirm('Bijlage verwijderen?');">Verwijderen</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+<section class="card stack upload-section">
+  <div>
+    <h2>European Instructions</h2>
+    <p class="muted">Voeg alleen toe wanneer van toepassing. Ook hier zijn meerdere foto’s of PDF-bestanden tegelijk toegestaan.</p>
+  </div>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('upload_files', service_date=d.isoformat(), category='european_instruction') }}" class="stack" data-submit-lock>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="upload-box"><span>Foto / bestand toevoegen</span>
+      <input type="file" name="attachments" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf" multiple required>
+    </label>
+    <button class="button secondary" type="submit" data-saving-text="Uploaden…">Upload European Instructions</button>
+  </form>
+  {% if attachments['european_instruction'] %}
+  <div class="attachments">
+    {% for item in attachments['european_instruction'] %}
+    <div class="attachment-row">
+      <a href="{{ url_for('attachment', attachment_id=item.row['id']) }}" target="_blank" rel="noopener">{{ item.label }} · {{ item.display_time }}</a>
+      <form method="post" action="{{ url_for('delete_attachment', attachment_id=item.row['id']) }}" data-submit-lock>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="danger-link" type="submit" onclick="return confirm('Bijlage verwijderen?');">Verwijderen</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

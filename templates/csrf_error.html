@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Formulier verlopen · Kerssing Trein{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <p class="eyebrow">Beveiliging</p>
+  <h1>Formulier kon niet worden verwerkt</h1>
+  <p>De beveiligingssessie is veranderd of verlopen. Ga terug naar de dag en probeer opnieuw. Een lokaal bewaard concept van de daggegevens blijft op dit apparaat beschikbaar.</p>
+  <a class="button primary" href="{{ url_for('week') }}">Naar weekoverzicht</a>
+</section>
+{% endblock %}

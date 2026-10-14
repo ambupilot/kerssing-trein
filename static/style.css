@@ -146,3 +146,23 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #98a2b3; outline-
 .delete-day-form {
   margin-top: 16px;
 }
+
+
+.heading-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 560px) {
+  .heading-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .heading-actions .button {
+    width: 100%;
+  }
+}

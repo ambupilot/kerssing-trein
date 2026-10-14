@@ -78,6 +78,7 @@ def init_db() -> None:
                 start_time TEXT,
                 end_time TEXT,
                 overrun_minutes INTEGER NOT NULL DEFAULT 0,
+                not_worked INTEGER NOT NULL DEFAULT 0,
                 notes TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -97,6 +98,10 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_duties_service_date ON duties(service_date);
             """
         )
+
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(duties)").fetchall()}
+        if "not_worked" not in columns:
+            conn.execute("ALTER TABLE duties ADD COLUMN not_worked INTEGER NOT NULL DEFAULT 0")
 
         username = os.getenv("ADMIN_USERNAME")
         password = os.getenv("ADMIN_PASSWORD")
@@ -276,8 +281,12 @@ def create_app() -> Flask:
         for offset in range(7):
             current_date = monday + timedelta(days=offset)
             row = by_date.get(current_date.isoformat())
-            duty_minutes = parse_span_minutes(row["start_time"], row["end_time"]) if row else 0
-            if row:
+            duty_minutes = (
+                parse_span_minutes(row["start_time"], row["end_time"])
+                if row and not row["not_worked"]
+                else 0
+            )
+            if row and not row["not_worked"]:
                 total_minutes += duty_minutes
                 total_overrun += max(0, row["overrun_minutes"] or 0)
             days.append({"date": current_date, "row": row, "duty_minutes": duty_minutes})
@@ -308,10 +317,11 @@ def create_app() -> Flask:
             abort(404)
 
         if request.method == "POST":
-            service_number = request.form.get("service_number", "").strip()
-            start_time = request.form.get("start_time") or None
-            end_time = request.form.get("end_time") or None
-            overrun_minutes = max(0, request.form.get("overrun_minutes", type=int) or 0)
+            not_worked = request.form.get("not_worked") == "1"
+            service_number = "" if not_worked else request.form.get("service_number", "").strip()
+            start_time = None if not_worked else (request.form.get("start_time") or None)
+            end_time = None if not_worked else (request.form.get("end_time") or None)
+            overrun_minutes = 0 if not_worked else max(0, request.form.get("overrun_minutes", type=int) or 0)
             notes = request.form.get("notes", "").strip()
             timestamp = now_iso()
 
@@ -320,19 +330,20 @@ def create_app() -> Flask:
                     """
                     INSERT INTO duties (
                         service_date, service_number, start_time, end_time,
-                        overrun_minutes, notes, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        overrun_minutes, not_worked, notes, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(service_date) DO UPDATE SET
                         service_number = excluded.service_number,
                         start_time = excluded.start_time,
                         end_time = excluded.end_time,
                         overrun_minutes = excluded.overrun_minutes,
+                        not_worked = excluded.not_worked,
                         notes = excluded.notes,
                         updated_at = excluded.updated_at
                     """,
                     (
                         service_day.isoformat(), service_number, start_time, end_time,
-                        overrun_minutes, notes, timestamp, timestamp,
+                        overrun_minutes, int(not_worked), notes, timestamp, timestamp,
                     ),
                 )
             flash("Dag opgeslagen.", "success")
@@ -355,9 +366,51 @@ def create_app() -> Flask:
             "day.html",
             d=service_day,
             row=row,
-            duty_minutes=parse_span_minutes(row["start_time"], row["end_time"]) if row else 0,
+            duty_minutes=(
+                parse_span_minutes(row["start_time"], row["end_time"])
+                if row and not row["not_worked"]
+                else 0
+            ),
             attachments=by_category,
         )
+
+    @app.post("/dag/<service_date>/verwijderen")
+    @login_required
+    def delete_day(service_date: str):
+        try:
+            service_day = date.fromisoformat(service_date)
+        except ValueError:
+            abort(404)
+
+        filenames = []
+        with db_connection() as conn:
+            row = conn.execute(
+                "SELECT id FROM duties WHERE service_date = ?",
+                (service_day.isoformat(),),
+            ).fetchone()
+            if row:
+                filenames = [
+                    item["filename"]
+                    for item in conn.execute(
+                        "SELECT filename FROM attachments WHERE duty_id = ?",
+                        (row["id"],),
+                    ).fetchall()
+                ]
+                conn.execute("DELETE FROM duties WHERE id = ?", (row["id"],))
+
+        archive_dir = day_archive_dir(service_day)
+        for filename in filenames:
+            try:
+                (archive_dir / filename).unlink(missing_ok=True)
+            except OSError:
+                pass
+        try:
+            archive_dir.rmdir()
+        except OSError:
+            pass
+
+        flash("Dag leeggemaakt.", "success")
+        return redirect(url_for("day", service_date=service_day.isoformat(), cleared="1"))
 
     @app.post("/dag/<service_date>/upload/<category>")
     @login_required
@@ -390,8 +443,8 @@ def create_app() -> Flask:
                     """
                     INSERT OR IGNORE INTO duties (
                         service_date, service_number, start_time, end_time,
-                        overrun_minutes, notes, created_at, updated_at
-                    ) VALUES (?, '', NULL, NULL, 0, '', ?, ?)
+                        overrun_minutes, not_worked, notes, created_at, updated_at
+                    ) VALUES (?, '', NULL, NULL, 0, 0, '', ?, ?)
                     """,
                     (service_day.isoformat(), timestamp, timestamp),
                 )

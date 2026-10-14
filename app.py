@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 import os
 import sqlite3
 import uuid
+import zipfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -11,6 +13,11 @@ from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf.csrf import CSRFError, CSRFProtect
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -306,6 +313,212 @@ def create_app() -> Flask:
             prev_week=prev_iso.week,
             next_year=next_iso.year,
             next_week=next_iso.week,
+        )
+
+    @app.get("/week/<int:iso_year>/<int:iso_week>/zip")
+    @login_required
+    def week_zip(iso_year: int, iso_week: int):
+        iso_year, iso_week = safe_week(iso_year, iso_week)
+        week_dir = ARCHIVE_DIR / str(iso_year) / f"{iso_week:02d}"
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            if week_dir.is_dir():
+                for path in sorted(week_dir.rglob("*")):
+                    if path.is_file():
+                        archive.write(path, arcname=path.relative_to(week_dir))
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"{iso_year}-{iso_week:02d}.zip",
+        )
+
+    @app.get("/week/<int:iso_year>/<int:iso_week>/pdf")
+    @login_required
+    def week_pdf(iso_year: int, iso_week: int):
+        iso_year, iso_week = safe_week(iso_year, iso_week)
+        monday, sunday = week_bounds(iso_year, iso_week)
+
+        with db_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT d.*,
+                       SUM(CASE WHEN a.category = 'dienstlijst' THEN 1 ELSE 0 END) AS dienstlijst_count,
+                       SUM(CASE WHEN a.category = 'european_instruction' THEN 1 ELSE 0 END) AS instruction_count,
+                       COUNT(a.id) AS attachment_count
+                FROM duties d
+                LEFT JOIN attachments a ON a.duty_id = d.id
+                WHERE d.service_date BETWEEN ? AND ?
+                GROUP BY d.id
+                ORDER BY d.service_date
+                """,
+                (monday.isoformat(), sunday.isoformat()),
+            ).fetchall()
+
+        by_date = {row["service_date"]: row for row in rows}
+        total_minutes = 0
+        total_overrun = 0
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=14 * mm,
+            leftMargin=14 * mm,
+            topMargin=14 * mm,
+            bottomMargin=14 * mm,
+            title=f"Treindiensten week {iso_week} - {iso_year}",
+            author="Kerssing Trein",
+        )
+        styles = getSampleStyleSheet()
+        small = ParagraphStyle(
+            "Small",
+            parent=styles["BodyText"],
+            fontSize=8.5,
+            leading=10.5,
+            spaceAfter=0,
+        )
+        note_style = ParagraphStyle(
+            "Note",
+            parent=styles["BodyText"],
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor("#4b5563"),
+            leftIndent=4 * mm,
+            spaceBefore=2 * mm,
+            spaceAfter=3 * mm,
+        )
+
+        story = [
+            Paragraph(f"Treindiensten - week {iso_week} / {iso_year}", styles["Title"]),
+            Paragraph(
+                f"{monday.strftime('%d-%m-%Y')} t/m {sunday.strftime('%d-%m-%Y')}",
+                styles["BodyText"],
+            ),
+            Spacer(1, 5 * mm),
+        ]
+
+        table_data = [[
+            "Dag",
+            "Datum",
+            "Status / dienst",
+            "Tijd",
+            "Uitloop",
+            "Bijlagen",
+        ]]
+
+        notes = []
+        for offset in range(7):
+            current_date = monday + timedelta(days=offset)
+            row = by_date.get(current_date.isoformat())
+
+            if row is None:
+                status = "Niet ingevuld"
+                time_text = "-"
+                overrun_text = "-"
+                attachments_text = "-"
+            elif row["not_worked"]:
+                status = "Niet gewerkt"
+                time_text = "-"
+                overrun_text = "-"
+                attachments_text = "-"
+            else:
+                duty_minutes = parse_span_minutes(row["start_time"], row["end_time"])
+                total_minutes += duty_minutes
+                total_overrun += max(0, row["overrun_minutes"] or 0)
+                status = f"Dienst {row['service_number'] or '-'}"
+                time_text = f"{row['start_time'] or '-'} - {row['end_time'] or '-'}"
+                overrun_text = format_minutes(row["overrun_minutes"])
+                parts = []
+                if row["dienstlijst_count"]:
+                    parts.append(f"Dienstlijst: {row['dienstlijst_count']}")
+                if row["instruction_count"]:
+                    parts.append(f"EI: {row['instruction_count']}")
+                attachments_text = ", ".join(parts) if parts else "Geen"
+
+            table_data.append([
+                DUTCH_DAYS[current_date.weekday()].capitalize(),
+                current_date.strftime("%d-%m-%Y"),
+                status,
+                time_text,
+                overrun_text,
+                attachments_text,
+            ])
+
+            if row and row["notes"]:
+                notes.append(
+                    (
+                        DUTCH_DAYS[current_date.weekday()].capitalize(),
+                        current_date.strftime("%d-%m-%Y"),
+                        row["notes"],
+                    )
+                )
+
+        table = Table(
+            table_data,
+            colWidths=[27 * mm, 25 * mm, 40 * mm, 30 * mm, 22 * mm, 38 * mm],
+            repeatRows=1,
+        )
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("LEADING", (0, 0), (-1, -1), 10.5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d1d5db")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 5 * mm))
+
+        summary = Table([
+            ["Totaal diensttijd", format_minutes(total_minutes)],
+            ["Totaal uitloop", format_minutes(total_overrun)],
+        ], colWidths=[45 * mm, 35 * mm])
+        summary.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9.5),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d1d5db")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f9fafb")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(summary)
+
+        if notes:
+            story.append(Spacer(1, 6 * mm))
+            story.append(Paragraph("Notities", styles["Heading2"]))
+            for day_name, date_text, note in notes:
+                story.append(Paragraph(
+                    f"<b>{day_name} {date_text}</b><br/>{note}",
+                    note_style,
+                ))
+
+        story.append(Spacer(1, 5 * mm))
+        story.append(Paragraph(
+            "Bijlagen zijn niet in deze PDF opgenomen. De kolom 'Bijlagen' vermeldt of een Dienstlijst en/of European Instructions aanwezig zijn. "
+            "Gebruik de ZIP-export om de originele bestanden van deze week te downloaden.",
+            small,
+        ))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{iso_year}-{iso_week:02d}.pdf",
         )
 
     @app.route("/dag/<service_date>", methods=["GET", "POST"])

@@ -22,7 +22,10 @@
       <strong>{{ DUTCH_DAYS[item.date.weekday()]|capitalize }}</strong>
       <span class="date">{{ item.date.strftime('%d-%m-%Y') }}</span>
     </div>
-    {% if item.row %}
+    {% if item.row and item.row['not_worked'] %}
+      <div class="day-details"><span class="service-number">Niet gewerkt</span>{% if item.row['notes'] %}<span>Notitie aanwezig</span>{% endif %}</div>
+      <div class="worked muted">—</div>
+    {% elif item.row %}
       <div class="day-details">
         <span class="service-number">Dienst {{ item.row['service_number'] or '—' }}</span>
         <span>{{ item.row['start_time'] or '—' }} – {{ item.row['end_time'] or '—' }}</span>

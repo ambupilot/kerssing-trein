@@ -64,3 +64,73 @@ def test_upload_unique_names(tmp_path):
     files = list(upload_dir.glob("*.jpg"))
     assert len(files) == 2
     assert files[0].name != files[1].name
+
+
+def test_not_worked_clears_duty_fields(tmp_path):
+    module = load_app(tmp_path)
+    client = module.app.test_client()
+    login(client)
+
+    client.post(
+        "/dag/2026-10-14",
+        data={
+            "service_number": "98765",
+            "start_time": "07:00",
+            "end_time": "15:00",
+            "overrun_minutes": "20",
+            "notes": "Vrij genomen",
+            "not_worked": "1",
+        },
+        follow_redirects=True,
+    )
+
+    with module.db_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM duties WHERE service_date = ?",
+            ("2026-10-14",),
+        ).fetchone()
+
+    assert row["not_worked"] == 1
+    assert row["service_number"] == ""
+    assert row["start_time"] is None
+    assert row["end_time"] is None
+    assert row["overrun_minutes"] == 0
+    assert row["notes"] == "Vrij genomen"
+
+
+def test_delete_day_removes_record_and_files(tmp_path):
+    from io import BytesIO
+
+    module = load_app(tmp_path)
+    client = module.app.test_client()
+    login(client)
+
+    client.post(
+        "/dag/2026-10-13",
+        data={
+            "service_number": "12345",
+            "start_time": "06:00",
+            "end_time": "14:00",
+            "overrun_minutes": "0",
+            "notes": "",
+        },
+    )
+    client.post(
+        "/dag/2026-10-13/upload/dienstlijst",
+        data={"attachments": (BytesIO(b"document"), "image.jpg")},
+        content_type="multipart/form-data",
+    )
+
+    upload_dir = tmp_path / "data" / "administratie" / "2026" / "42" / "dinsdag"
+    assert list(upload_dir.glob("*"))
+
+    response = client.post("/dag/2026-10-13/verwijderen", follow_redirects=True)
+    assert response.status_code == 200
+
+    with module.db_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM duties WHERE service_date = ?",
+            ("2026-10-13",),
+        ).fetchone()
+    assert row is None
+    assert not list(upload_dir.glob("*"))

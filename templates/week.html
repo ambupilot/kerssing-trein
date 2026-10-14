@@ -7,6 +7,10 @@
     <h1>Week {{ iso_week }} · {{ iso_year }}</h1>
     <p class="muted">{{ monday.strftime('%d-%m-%Y') }} t/m {{ sunday.strftime('%d-%m-%Y') }}</p>
   </div>
+  <div class="heading-actions">
+    <a class="button secondary" href="{{ url_for('week_pdf', iso_year=iso_year, iso_week=iso_week) }}">PDF downloaden</a>
+    <a class="button secondary" href="{{ url_for('week_zip', iso_year=iso_year, iso_week=iso_week) }}">ZIP downloaden</a>
+  </div>
 </section>
 
 <nav class="week-nav" aria-label="Weeknavigatie">

@@ -55,9 +55,13 @@
 
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('saved') === '1') {
+      if (params.get('saved') === '1' || params.get('cleared') === '1') {
         localStorage.removeItem(key);
-        if (status) status.textContent = 'Dag is op de server opgeslagen.';
+        if (status) {
+          status.textContent = params.get('cleared') === '1'
+            ? 'Dag is leeggemaakt.'
+            : 'Dag is op de server opgeslagen.';
+        }
       } else {
         const raw = localStorage.getItem(key);
         if (raw) {

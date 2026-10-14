@@ -134,3 +134,50 @@ def test_delete_day_removes_record_and_files(tmp_path):
         ).fetchone()
     assert row is None
     assert not list(upload_dir.glob("*"))
+
+
+def test_week_zip_export(tmp_path):
+    from io import BytesIO
+    import zipfile
+
+    module = load_app(tmp_path)
+    client = module.app.test_client()
+    login(client)
+
+    client.post(
+        "/dag/2026-10-13/upload/dienstlijst",
+        data={"attachments": (BytesIO(b"document"), "image.jpg")},
+        content_type="multipart/form-data",
+    )
+
+    response = client.get("/week/2026/42/zip")
+    assert response.status_code == 200
+    assert response.mimetype == "application/zip"
+    assert "2026-42.zip" in response.headers["Content-Disposition"]
+
+    with zipfile.ZipFile(BytesIO(response.data)) as archive:
+        names = archive.namelist()
+    assert any(name.startswith("dinsdag/") and name.endswith(".jpg") for name in names)
+
+
+def test_week_pdf_export(tmp_path):
+    module = load_app(tmp_path)
+    client = module.app.test_client()
+    login(client)
+
+    client.post(
+        "/dag/2026-10-13",
+        data={
+            "service_number": "12345",
+            "start_time": "06:12",
+            "end_time": "14:30",
+            "overrun_minutes": "15",
+            "notes": "Testdienst",
+        },
+    )
+
+    response = client.get("/week/2026/42/pdf")
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert "2026-42.pdf" in response.headers["Content-Disposition"]
+    assert response.data.startswith(b"%PDF")

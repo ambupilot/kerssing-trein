@@ -112,3 +112,37 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #98a2b3; outline-
   .day-details { gap: 8px 10px; }
   .attachment-row { align-items: flex-start; }
 }
+
+
+.button.danger {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid #e3b6b1;
+}
+
+.button.danger:hover {
+  background: var(--error-bg);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.checkbox-help {
+  margin: -8px 0 4px;
+  font-size: .9rem;
+}
+
+.delete-day-form {
+  margin-top: 16px;
+}

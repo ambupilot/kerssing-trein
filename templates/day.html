@@ -14,6 +14,11 @@
 <form method="post" class="stack" id="duty-form" data-draft-form data-draft-key="kerssing-trein:{{ d.isoformat() }}" data-submit-lock>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="card stack">
+    <label class="checkbox-row">
+      <input type="checkbox" name="not_worked" value="1" {% if row and row['not_worked'] %}checked{% endif %}>
+      <span>Niet gewerkt</span>
+    </label>
+    <p class="muted checkbox-help">Gebruik dit voor een geplande dag waarop je uiteindelijk niet hebt gewerkt. Dienstnummer, tijden en uitloop worden dan leeggemaakt; een notitie kan wel blijven staan.</p>
     <div class="field-grid">
       <label>Dienstnummer
         <input type="text" name="service_number" value="{{ row['service_number'] if row else '' }}" inputmode="numeric" autocomplete="off" placeholder="Bijv. 12345">
@@ -31,12 +36,23 @@
     <label>Notitie
       <textarea name="notes" rows="4" placeholder="Optioneel">{{ row['notes'] if row else '' }}</textarea>
     </label>
-    <div class="worked-summary"><span>Diensttijd</span><strong>{{ format_minutes(duty_minutes) }}</strong></div>
+    <div class="worked-summary">
+      <span>{% if row and row['not_worked'] %}Status{% else %}Diensttijd{% endif %}</span>
+      <strong>{% if row and row['not_worked'] %}Niet gewerkt{% else %}{{ format_minutes(duty_minutes) }}{% endif %}</strong>
+    </div>
   </section>
   <button class="button primary large" type="submit" data-saving-text="Opslaan…">Dag opslaan</button>
   <p class="draft-status muted" data-draft-status></p>
 </form>
 
+{% if row %}
+<form method="post" action="{{ url_for('delete_day', service_date=d.isoformat()) }}" class="delete-day-form" data-submit-lock>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="button danger large" type="submit" data-saving-text="Leegmaken…" onclick="return confirm('Deze volledige dag leegmaken? De daggegevens en alle geüploade bestanden worden definitief verwijderd.');">Dag leegmaken</button>
+</form>
+{% endif %}
+
+{% if not (row and row['not_worked']) %}
 <section class="card stack upload-section">
   <div>
     <h2>Dienstlijst</h2>
@@ -90,4 +106,5 @@
   </div>
   {% endif %}
 </section>
+{% endif %}
 {% endblock %}

@@ -12,7 +12,7 @@ const TYPES = [
 const $=id=>document.getElementById(id);
 let SCHEMA={};
 const state={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null};
-let db, wake=null, saveChain=Promise.resolve(), syncBusy=false;
+let db, wake=null, saveChain=Promise.resolve(), syncBusy=false, archiveBusy=false;
 const draftKey="current";
 function currentLocalDateTime(){const now=new Date(), local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();return {date:local.slice(0,10),time:local.slice(11,16)};}
 function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("kerssing-ei",1);req.onupgradeneeded=()=>req.result.createObjectStore("drafts");req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
@@ -167,7 +167,7 @@ root.append(card);
 }
 $("ei-completed").checked=!!state.completed;
 $("ei-completed-at").textContent=state.completedAt?"Afgehandeld op "+new Date(state.completedAt).toLocaleString("nl-NL"):"Nog niet afgehandeld";
-$("ei-completed-box").hidden=!state.accepted;$("ei-new").hidden=!state.completed;
+$("ei-completed-box").hidden=!state.accepted;$("ei-new").hidden=!state.completed;$("ei-archive").hidden=!state.completed;
 }
 async function requestWake(){
 if(!state.accepted||state.completed)return;
@@ -178,7 +178,7 @@ document.querySelectorAll(".ei-choice").forEach(c=>c.addEventListener("change",(
 $("ei-accept").addEventListener("click",()=>{if(!state.selected.length){alert("Selecteer minimaal één EI.");return;}if(!db){alert("Lokale opslag is niet beschikbaar. Aannemen is geblokkeerd.");return;}if(!state.date&&!state.time)Object.assign(state,currentLocalDateTime());state.accepted=true;render();save();requestWake();});
 $("ei-completed").addEventListener("change",e=>{if(e.target.checked&&!confirm("Markeer deze EI als afgehandeld? De registratie blijft bewaard.")){e.target.checked=false;return;}state.completed=e.target.checked;state.completedAt=state.completed?new Date().toISOString():null;if(state.completed){wake?.release();wake=null;}else requestWake();save();render();if(navigator.onLine)saveChain.then(sync);});
 $("ei-back").addEventListener("click",()=>{state.accepted=false;wake?.release();wake=null;render();save();});
-$("ei-new").addEventListener("click",()=>{if(!state.completed){alert("Markeer de huidige EI eerst als afgehandeld voordat je een nieuwe start.");return;}if(!confirm("Nieuwe EI starten? De identificatie en ingevulde velden worden leeggemaakt. Controleer of de vorige EI gesynchroniseerd is."))return;const fresh={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null,recordId:crypto.randomUUID(),revision:0,syncedRevision:0};Object.assign(state,fresh);wake?.release();wake=null;render();save();$("ei-sync-status").textContent="Nieuwe EI — nog niet gesynchroniseerd";});
+$("ei-new").addEventListener("click",()=>{if(!state.completed){alert("Markeer de huidige EI eerst als afgehandeld voordat je een nieuwe start.");return;}if(state.archivedRevision!==state.revision){alert("Archiveer de afgehandelde EI eerst op de server voordat je een nieuwe EI start.");return;}if(!confirm("Nieuwe EI starten? De identificatie en ingevulde velden worden leeggemaakt."))return;const fresh={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null,recordId:crypto.randomUUID(),revision:0,syncedRevision:0,archivedRevision:0};Object.assign(state,fresh);wake?.release();wake=null;render();save();$("ei-sync-status").textContent="Nieuwe EI — nog niet gesynchroniseerd";});
 for(const [id,key] of [["ei-id","identification"],["ei-date","date"],["ei-time","time"]])$(id).addEventListener("input",e=>{state[key]=e.target.value;save();});
 function connectivity(){$("ei-connectivity").textContent=navigator.onLine?"Online — controleer synchronisatiestatus":"Offline — concept uitsluitend lokaal opgeslagen";}
 async function sync(){
@@ -200,6 +200,28 @@ async function sync(){
  }catch(e){$("ei-sync-status").textContent="Niet gesynchroniseerd — lokaal behouden ("+e.message+")";}
  finally{syncBusy=false;}
 }
+async function archiveEI(){
+ if(archiveBusy||!state.completed)return;
+ if(!navigator.onLine){$("ei-archive-status").textContent="Offline: archiveren zodra er weer verbinding is.";return;}
+ archiveBusy=true;
+ try{
+  await saveChain;
+  await sync();
+  await saveChain;
+  const data=await transact("readonly",store=>store.get(draftKey));
+  if(!data||data.syncedRevision!==data.revision)throw Error("Synchronisatie is nog niet bevestigd");
+  const response=await fetch("/api/ei/archive",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":$("ei-csrf").value},credentials:"same-origin",body:JSON.stringify({recordId:data.recordId,revision:data.revision})});
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error||"HTTP "+response.status);
+  state.archivedRevision=data.revision;
+  const current=await transact("readonly",store=>store.get(draftKey));
+  if(current&&current.recordId===data.recordId&&current.revision===data.revision){current.archivedRevision=data.revision;await transact("readwrite",store=>store.put(current,draftKey));}
+  $("ei-archive-status").textContent="PDF gearchiveerd bij dagstaat "+result.date+".";
+  $("ei-day-link").href=result.day_url;$("ei-day-link").hidden=false;
+ }catch(e){$("ei-archive-status").textContent="Archiveren niet gelukt: "+e.message;}
+ finally{archiveBusy=false;}
+}
+$("ei-archive").addEventListener("click",archiveEI);
 $("ei-sync").addEventListener("click",sync);
 window.addEventListener("online",()=>{connectivity();sync();});window.addEventListener("offline",connectivity);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.accepted&&!state.completed&&!wake)requestWake();});

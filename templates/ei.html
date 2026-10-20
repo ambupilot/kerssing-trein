@@ -20,7 +20,21 @@
 .ei-fixed-cross{appearance:none!important;-webkit-appearance:none!important;width:13px!important;height:13px!important;flex:none!important;margin:0!important;border:0!important;background:#fff!important;position:relative;border-radius:4px!important;opacity:1!important;cursor:default}
 .ei-fixed-cross:after{content:"×";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#e1252a;font-size:15px;line-height:1}
 @media(max-width:650px){.ei-special-speed{margin-left:12px;grid-template-columns:minmax(0,1fr) 35%}.ei-special-check{margin-left:12px}.ei-special-location-row{margin-left:12px;gap:6px}.ei-special-location{grid-template-columns:1fr;gap:3px}.ei-crossing-grid{margin-left:12px;gap:5px}.ei-special-input::placeholder{font-size:9px}}
-.ei-special-check input.ei-fixed-cross,.ei-check-row input.ei-fixed-cross{box-sizing:border-box!important;display:inline-block!important;inline-size:13px!important;block-size:13px!important;min-inline-size:13px!important;min-block-size:13px!important;max-inline-size:13px!important;max-block-size:13px!important;padding:0!important;vertical-align:middle!important;flex:0 0 13px!important;align-self:center!important;overflow:hidden!important}.ei-fixed-cross:after{font-size:12px!important;line-height:13px!important}</style>
+.ei-special-check input.ei-fixed-cross,.ei-check-row input.ei-fixed-cross{box-sizing:border-box!important;display:inline-block!important;inline-size:13px!important;block-size:13px!important;min-inline-size:13px!important;min-block-size:13px!important;max-inline-size:13px!important;max-block-size:13px!important;padding:0!important;vertical-align:middle!important;flex:0 0 13px!important;align-self:center!important;overflow:hidden!important}.ei-fixed-cross:after{font-size:12px!important;line-height:13px!important}
+.ei-paper-exact .ei-card-title{display:flex;align-items:center;gap:9px;font-size:13px;margin:0 0 5px;font-weight:800}
+.ei-paper-row{display:flex;align-items:center;min-height:19px}
+.ei-paper-indent-1{margin-left:45px}
+.ei-paper-indent-2{margin-left:85px}
+.ei-paper-check{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:13px;line-height:1.3;min-width:0}
+.ei-paper-check>.ei-check{width:13px;height:13px;flex:0 0 13px;margin:0;accent-color:#24b147}
+.ei-paper-check .ei-paper-input{width:170px;max-width:100%;margin:0 4px}
+.ei-paper-input{box-sizing:border-box;min-width:0;background:#fff;border:2px solid #e1252a;border-radius:0;padding:8px 6px;color:#111;text-align:right;font-size:14px}
+.ei-paper-input::placeholder{font-size:10px;color:#999}
+textarea.ei-paper-input{display:block;width:calc(100% - 48px);margin:4px 24px 6px 24px;min-height:45px;text-align:left;resize:vertical}
+textarea.ei-paper-textarea{min-height:85px}
+.ei-paper-caption{display:block;margin:4px 24px 2px;font-size:13px}
+@media(max-width:650px){.ei-paper-indent-1{margin-left:25px}.ei-paper-indent-2{margin-left:45px}textarea.ei-paper-input{width:calc(100% - 20px);margin-left:10px;margin-right:10px}}
+</style>
 <section class="ei-page">
 <h1>European Instructions</h1>
 <p class="ei-note"><strong>Ontwikkelversie — niet voor operationeel gebruik.</strong> De officiële subvelden en procedure moeten nog worden gevalideerd. Gebruik de voorgeschreven spoorwegprocedure.</p>
@@ -52,6 +66,6 @@
 </section>
 <script defer src="{{ url_for('static', filename='ei.js') }}"></script>
 <script>
-if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v5"); if(navigator.onLine){const page=await fetch("/ei/new",{credentials:"same-origin"});if(page.ok&&page.headers.get("content-type")?.includes("text/html"))await cache.put("/ei/new",page.clone());}const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v6"); if(navigator.onLine){const page=await fetch("/ei/new",{credentials:"same-origin"});if(page.ok&&page.headers.get("content-type")?.includes("text/html"))await cache.put("/ei/new",page.clone());}const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
 </script>
 {% endblock %}

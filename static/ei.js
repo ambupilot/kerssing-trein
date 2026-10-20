@@ -14,15 +14,14 @@ let SCHEMA={};
 const state={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null};
 let db, wake=null, saveChain=Promise.resolve(), syncBusy=false;
 const draftKey="current";
-const now=new Date(), local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();
-state.date=local.slice(0,10);state.time=local.slice(11,16);
+function currentLocalDateTime(){const now=new Date(), local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();return {date:local.slice(0,10),time:local.slice(11,16)};}
 function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("kerssing-ei",1);req.onupgradeneeded=()=>req.result.createObjectStore("drafts");req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function transact(mode,fn){return new Promise((resolve,reject)=>{const tx=db.transaction("drafts",mode),req=fn(tx.objectStore("drafts"));req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function snapshot(){return JSON.parse(JSON.stringify(state));}
 function markDirty(){state.revision=(state.revision||0)+1;state.syncedRevision=state.syncedRevision||0;}
 function save(){markDirty();const data=snapshot();$("ei-storage").textContent="Lokaal opslaan…";saveChain=saveChain.catch(()=>{}).then(()=>transact("readwrite",s=>s.put(data,draftKey))).then(()=>$("ei-storage").textContent="Lokaal opgeslagen om "+new Date().toLocaleTimeString("nl-NL"),()=>$("ei-storage").textContent="WAARSCHUWING: lokaal opslaan mislukt");}
 function render(){
-$("ei-selection").hidden=state.accepted;$("ei-selected").hidden=!state.accepted;
+$("ei-selection").hidden=state.accepted;$("ei-selected").hidden=!state.accepted;$("ei-identification").hidden=!state.accepted;$("ei-draft-status").hidden=state.accepted;
 document.querySelectorAll(".ei-choice").forEach(c=>c.checked=state.selected.includes(c.value));
 $("ei-id").value=state.identification;$("ei-date").value=state.date;$("ei-time").value=state.time;
 const root=$("ei-forms");root.replaceChildren();
@@ -49,7 +48,7 @@ root.append(card);
 }
 $("ei-completed").checked=!!state.completed;
 $("ei-completed-at").textContent=state.completedAt?"Afgehandeld op "+new Date(state.completedAt).toLocaleString("nl-NL"):"Nog niet afgehandeld";
-$("ei-completed-box").hidden=!state.accepted;
+$("ei-completed-box").hidden=!state.accepted;$("ei-new").hidden=!state.completed;
 }
 async function requestWake(){
 if(!state.accepted||state.completed)return;
@@ -57,9 +56,10 @@ try{if(!("wakeLock" in navigator))throw Error("Niet ondersteund");wake=await nav
 catch(e){$("ei-wake").textContent="WAARSCHUWING: scherm kan uitschakelen ("+e.message+")";}
 }
 document.querySelectorAll(".ei-choice").forEach(c=>c.addEventListener("change",()=>{state.selected=Array.from(document.querySelectorAll(".ei-choice:checked")).map(x=>x.value);save();}));
-$("ei-accept").addEventListener("click",()=>{if(!state.selected.length){alert("Selecteer minimaal één EI.");return;}if(!db){alert("Lokale opslag is niet beschikbaar. Aannemen is geblokkeerd.");return;}state.accepted=true;render();save();requestWake();});
+$("ei-accept").addEventListener("click",()=>{if(!state.selected.length){alert("Selecteer minimaal één EI.");return;}if(!db){alert("Lokale opslag is niet beschikbaar. Aannemen is geblokkeerd.");return;}if(!state.date&&!state.time)Object.assign(state,currentLocalDateTime());state.accepted=true;render();save();requestWake();});
 $("ei-completed").addEventListener("change",e=>{if(e.target.checked&&!confirm("Markeer deze EI als afgehandeld? De registratie blijft bewaard.")){e.target.checked=false;return;}state.completed=e.target.checked;state.completedAt=state.completed?new Date().toISOString():null;if(state.completed){wake?.release();wake=null;}else requestWake();save();render();if(navigator.onLine)saveChain.then(sync);});
 $("ei-back").addEventListener("click",()=>{state.accepted=false;wake?.release();wake=null;render();save();});
+$("ei-new").addEventListener("click",()=>{if(!state.completed){alert("Markeer de huidige EI eerst als afgehandeld voordat je een nieuwe start.");return;}if(!confirm("Nieuwe EI starten? De identificatie en ingevulde velden worden leeggemaakt. Controleer of de vorige EI gesynchroniseerd is."))return;const fresh={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null,recordId:crypto.randomUUID(),revision:0,syncedRevision:0};Object.assign(state,fresh);wake?.release();wake=null;render();save();$("ei-sync-status").textContent="Nieuwe EI — nog niet gesynchroniseerd";});
 for(const [id,key] of [["ei-id","identification"],["ei-date","date"],["ei-time","time"]])$(id).addEventListener("input",e=>{state[key]=e.target.value;save();});
 function connectivity(){$("ei-connectivity").textContent=navigator.onLine?"Online — controleer synchronisatiestatus":"Offline — concept uitsluitend lokaal opgeslagen";}
 async function sync(){

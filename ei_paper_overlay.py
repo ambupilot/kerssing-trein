@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from urllib.request import urlopen
 
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter, Transformation
 from reportlab.pdfgen import canvas
 
 TEMPLATE_URL = "https://vvrv.nl/uploads/files/page/forrmulier-european-instructions-trdl.pdf"
@@ -135,12 +135,38 @@ def build_ei_pdf(payload):
 
     # Identification goes in the official identification box; no right-hand
     # train-dispatcher fields or signatures are fabricated.
-    fill((690, 69, 905, 90), payload.get("identification", ""))
     c.save()
     overlay.seek(0)
     writer = PdfWriter()
     page.merge_page(PdfReader(overlay).pages[0])
-    writer.add_page(page)
+    driver_width = width * 650 / PAGE_W
+    page.cropbox.lower_left = (0, 0)
+    page.cropbox.upper_right = (driver_width, height)
+    footer_height = 94
+    output_page = writer.add_blank_page(width=driver_width, height=height+footer_height)
+    output_page.merge_transformed_page(page, Transformation().translate(ty=footer_height))
+    footer_data = io.BytesIO()
+    footer = canvas.Canvas(footer_data, pagesize=(driver_width, height+footer_height))
+    footer.setFont("Helvetica-Bold", 10)
+    footer.drawString(15, 74, "Identificatie")
+    footer.setFont("Helvetica", 8)
+    columns = [
+        ("Identificatienummer", payload.get("identification", "")),
+        ("Datum", payload.get("date", "")),
+        ("Tijd", payload.get("time", "")),
+        ("Handtekening", ""),
+    ]
+    cell_width = (driver_width-30)/4
+    for index, (label, value) in enumerate(columns):
+        x = 15+index*cell_width
+        footer.drawString(x+3, 57, label)
+        footer.rect(x, 24, cell_width-4, 28)
+        footer.setFont("Helvetica", 9)
+        footer.drawString(x+3, 34, str(value)[:19])
+        footer.setFont("Helvetica", 8)
+    footer.save()
+    footer_data.seek(0)
+    output_page.merge_page(PdfReader(footer_data).pages[0])
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()

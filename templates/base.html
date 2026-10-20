@@ -12,6 +12,7 @@
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="{{ url_for('week') }}">Kerssing Trein</a>
+      {% if current_user.is_authenticated %}<a href="{{ url_for('ei_new') }}">European Instructions (test)</a>{% endif %}
       {% if current_user.is_authenticated %}
       <form method="post" action="{{ url_for('logout') }}" data-submit-lock>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

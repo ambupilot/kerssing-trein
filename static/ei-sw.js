@@ -1,4 +1,4 @@
-const CACHE="kerssing-ei-v2";
+const CACHE="kerssing-ei-v3";
 const STATIC=["/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js","/static/ei-logout.js"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(async cache=>{await cache.addAll(STATIC);await self.skipWaiting();}));});
 self.addEventListener("activate",event=>{event.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith("kerssing-ei-")&&key!==CACHE)await caches.delete(key);await self.clients.claim();})());});

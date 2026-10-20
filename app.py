@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import json
+import re
 import os
 import sqlite3
 import uuid
@@ -10,7 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for, jsonify, make_response
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from reportlab.lib import colors
@@ -71,6 +73,16 @@ def init_db() -> None:
     with db_connection() as conn:
         conn.executescript(
             """
+            CREATE TABLE IF NOT EXISTS ei_snapshots (
+                record_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                owner_id INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                PRIMARY KEY(record_id, revision),
+                FOREIGN KEY(owner_id) REFERENCES users(id)
+            );
+
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -226,6 +238,57 @@ def create_app() -> Flask:
     def payload_too_large(_error):
         flash("De geselecteerde bestanden zijn samen te groot. Kies kleinere bestanden of upload ze in delen.", "error")
         return redirect(request.referrer or url_for("week"))
+
+    @app.post("/api/ei/sync")
+    @login_required
+    def ei_sync():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(error="Ongeldige JSON"), 400
+        record_id = payload.get("recordId")
+        revision = payload.get("revision")
+        selected = payload.get("selected")
+        if not isinstance(record_id, str) or not re.fullmatch(r"[0-9a-fA-F-]{36}", record_id):
+            return jsonify(error="Ongeldige registratie-ID"), 400
+        try:
+            uuid.UUID(record_id)
+        except ValueError:
+            return jsonify(error="Ongeldige registratie-ID"), 400
+        if type(revision) is not int or revision < 1 or revision > 100000000:
+            return jsonify(error="Ongeldige revisie"), 400
+        if not isinstance(selected, list) or not selected or len(selected) > 10 or any(str(n) not in {str(i) for i in range(1, 9)} | {"90", "95"} for n in selected):
+            return jsonify(error="Ongeldige EI-selectie"), 400
+        if not isinstance(payload.get("identification"), str) or not 0 < len(payload["identification"].strip()) <= 120:
+            return jsonify(error="Identificatienummer ontbreekt"), 400
+        try:
+            date.fromisoformat(payload["date"])
+            datetime.strptime(payload["time"], "%H:%M")
+        except (KeyError, TypeError, ValueError):
+            return jsonify(error="Datum of tijd ongeldig"), 400
+        if not isinstance(payload.get("details"), dict) or not isinstance(payload.get("checks"), dict):
+            return jsonify(error="Formuliervelden ongeldig"), 400
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        if len(encoded.encode("utf-8")) > 100000:
+            return jsonify(error="Registratie te groot"), 413
+        with db_connection() as conn:
+            owner = conn.execute("SELECT owner_id FROM ei_snapshots WHERE record_id = ? LIMIT 1", (record_id,)).fetchone()
+            if owner and owner["owner_id"] != int(current_user.id):
+                return jsonify(error="Registratie behoort aan andere gebruiker"), 403
+            existing = conn.execute("SELECT payload FROM ei_snapshots WHERE record_id = ? AND revision = ?", (record_id, revision)).fetchone()
+            if existing:
+                if existing["payload"] != encoded:
+                    return jsonify(error="Revisieconflict: lokale gegevens behouden"), 409
+            else:
+                conn.execute("INSERT INTO ei_snapshots (record_id, revision, owner_id, payload, received_at) VALUES (?, ?, ?, ?, ?)",
+                             (record_id, revision, int(current_user.id), encoded, now_iso()))
+        return jsonify(status="stored", record_id=record_id, revision=revision)
+
+    @app.get("/ei/offline")
+    @login_required
+    def ei_offline_page():
+        response = make_response(redirect(url_for("ei_new")))
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/ei/new")
     @login_required

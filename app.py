@@ -239,6 +239,8 @@ def create_app() -> Flask:
             (6, "Verplichting om te rijden op zicht", "#F5F09B"),
             (7, "Toestemming om te vertrekken", "#D2D4D4"),
             (8, "Toestemming om een defecte overweg te passeren", "#F8C4A7"),
+            (90, "Controleren van de infrastructuur", "#B8DDB4"),
+            (95, "Aanvullende opdracht", "#E1E1E1"),
         ]
         return render_template("ei.html", ei_types=ei_types)
 

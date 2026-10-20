@@ -227,6 +227,21 @@ def create_app() -> Flask:
         flash("De geselecteerde bestanden zijn samen te groot. Kies kleinere bestanden of upload ze in delen.", "error")
         return redirect(request.referrer or url_for("week"))
 
+    @app.get("/ei/new")
+    @login_required
+    def ei_new():
+        ei_types = [
+            (1, "Toestemming een EOA/stoptonend sein te passeren", "#F5B3B4"),
+            (2, "Toestemming tot doorrijden na TRIP", "#D2D4D4"),
+            (3, "Verplichting om stil te blijven staan", "#EDD0E0"),
+            (4, "Intrekking van een instructie", "#FFF0BD"),
+            (5, "Verplichting om de snelheid te beperken", "#AFD2EB"),
+            (6, "Verplichting om te rijden op zicht", "#F5F09B"),
+            (7, "Toestemming om te vertrekken", "#D2D4D4"),
+            (8, "Toestemming om een defecte overweg te passeren", "#F8C4A7"),
+        ]
+        return render_template("ei.html", ei_types=ei_types)
+
     @app.route("/health")
     def health():
         return {"status": "ok"}

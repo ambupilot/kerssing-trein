@@ -103,6 +103,51 @@ if(num==="5"||num==="6"||num==="8"){
  }
  root.append(card);continue;
 }
+
+if(["2","3","4","7","90","95"].includes(num)){
+ card.classList.add("ei-paper-exact");
+ const check=(code,description,indent=1,fixed=false)=>{
+  const row=document.createElement("div");row.className="ei-paper-row ei-paper-indent-"+indent;
+  const label=document.createElement("label");label.className="ei-paper-check";
+  const cb=document.createElement("input");cb.type="checkbox";cb.className="ei-check";
+  cb.checked=fixed||!!(state.checks[num]||{})[code];cb.disabled=fixed;
+  if(fixed)cb.classList.add("ei-fixed-cross");
+  else cb.addEventListener("change",()=>{(state.checks[num]??={})[code]=cb.checked;save();});
+  const caption=document.createElement("span");const codeEl=document.createElement("span");codeEl.className="ei-one-code";codeEl.textContent=code+" ";
+  caption.append(codeEl,document.createTextNode(description));label.append(cb,caption);row.append(label);card.append(row);return row;
+ };
+ const field=(key,hint,textarea=false)=>{
+  const input=document.createElement(textarea?"textarea":"input");if(!textarea)input.type="text";
+  input.className="ei-paper-input";input.placeholder=hint;input.setAttribute("aria-label",hint);
+  input.value=(state.details[num]||{})[key]||"";
+  input.addEventListener("input",()=>{(state.details[num]??={})[key]=input.value;save();});return input;
+ };
+ const headingBox=document.createElement("input");headingBox.type="checkbox";headingBox.className="ei-main-check";headingBox.checked=true;headingBox.disabled=true;headingBox.setAttribute("aria-label","EI "+num+" geselecteerd");h.prepend(headingBox);
+ if(num==="2"){
+  check("2.10","heeft toestemming om door te rijden in SR, als er geen MA is ontvangen");
+  check("2.11","heeft toestemming om door te rijden in SH");
+ }else if(num==="3"){
+  check("3.10","op de huidige locatie");check("3.20","beschikbare MA verwijderen");
+ }else if(num==="4"){
+  const row=check("4.10","de Operational Instruction met ID");
+  const label=row.querySelector(".ei-paper-check");label.append(field("instruction_id","ID 4.11"),document.createTextNode(" is ingetrokken"));
+ }else if(num==="7"){
+  check("7.10","heeft toestemming om te vertrekken in SR");
+  check("7.11","heeft toestemming om te vertrekken in SH");
+  const row=check("7.20","heeft toestemming om EOA/ SMB",2);
+  row.querySelector(".ei-paper-check").append(field("signal","7.21 sein"),document.createTextNode(" te passeren"));
+  check("7.23","het is verboden om override EOA te gebruiken",2,true);
+ }else if(num==="90"){
+  h.textContent="x.90 controleren van de infrastructuur om de volgende redenen";h.prepend(headingBox);
+  const reason=field("reason","vrije tekst x.91",true);reason.classList.add("ei-paper-textarea");card.append(reason);
+  const caption=document.createElement("label");caption.className="ei-paper-caption";caption.textContent="Meld bevindingen aan:";card.append(caption);
+  const report=field("report","vrije tekst x.92",true);card.append(report);
+ }else if(num==="95"){
+  h.textContent="x.95 aanvullende opdracht:";h.prepend(headingBox);
+  const instruction=field("instruction","vrije tekst x.96",true);instruction.classList.add("ei-paper-textarea");card.append(instruction);
+ }
+ root.append(card);continue;
+}
 for(const [code,description] of def.checks){
 const label=document.createElement("label");label.className="ei-check-row";
 const cb=document.createElement("input");cb.type="checkbox";cb.checked=(num==="7"&&code==="7.23")?true:!!(state.checks[num]||{})[code];cb.className="ei-check";if(num==="7"&&code==="7.23"){cb.disabled=true;cb.classList.add("ei-fixed-cross");}

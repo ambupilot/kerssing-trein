@@ -11,7 +11,7 @@ const TYPES = [
 ["8","Toestemming om een defecte overweg te passeren","#F8C4A7"]];
 const $=id=>document.getElementById(id);
 let SCHEMA={};
-const state={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:""};
+const state={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null};
 let db, wake=null, saveChain=Promise.resolve(), syncBusy=false;
 const draftKey="current";
 const now=new Date(), local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();
@@ -28,33 +28,37 @@ $("ei-id").value=state.identification;$("ei-date").value=state.date;$("ei-time")
 const root=$("ei-forms");root.replaceChildren();
 if(state.accepted) for(const num of state.selected){
 const def=SCHEMA[num];if(!def)continue;
-const card=document.createElement("section");card.className="ei-card";card.style.background=def.color;
-const h=document.createElement("h3");h.textContent=(Number(num)>8?"x.":"EI ")+num+" — "+def.title;card.append(h);
+const card=document.createElement("section");card.className="ei-card";card.style.background=def.color;card.dataset.type=num;
+const h=document.createElement("h3");h.className="ei-card-title";h.textContent=(Number(num)>8?"x.":"")+num+" "+def.title;card.append(h);
 for(const [code,description] of def.checks){
-const label=document.createElement("label");label.style.display="flex";label.style.gap="10px";label.style.margin="12px 0";
-const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!(state.checks[num]||{})[code];cb.style.width="22px";cb.style.height="22px";
+const label=document.createElement("label");label.className="ei-check-row";
+const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!(state.checks[num]||{})[code];cb.className="ei-check";
 cb.addEventListener("change",()=>{(state.checks[num]??={})[code]=cb.checked;save();});
 const span=document.createElement("span");span.textContent=code+" "+description;label.append(cb,span);card.append(label);
 }
 for(const [key,description,type] of def.fields){
-const label=document.createElement("label");label.style.display="block";label.style.margin="12px 0";
-const span=document.createElement("span");span.textContent=description;span.style.display="block";span.style.fontWeight="600";
+const label=document.createElement("label");label.className="ei-field";
+const span=document.createElement("span");span.textContent=description;span.className="ei-field-label";
 const field=document.createElement(type==="textarea"?"textarea":"input");
-if(type!=="textarea")field.type=type;field.style.width="100%";field.style.padding="10px";
+if(type!=="textarea")field.type=type;field.className="ei-field-input";
 field.value=(state.details[num]||{})[key]||"";
 field.addEventListener("input",()=>{if(typeof state.details[num]!=="object"||!state.details[num])state.details[num]={};state.details[num][key]=field.value;save();});
 label.append(span,field);card.append(label);
 }
 root.append(card);
 }
+$("ei-completed").checked=!!state.completed;
+$("ei-completed-at").textContent=state.completedAt?"Afgehandeld op "+new Date(state.completedAt).toLocaleString("nl-NL"):"Nog niet afgehandeld";
+$("ei-completed-box").hidden=!state.accepted;
 }
 async function requestWake(){
-if(!state.accepted)return;
+if(!state.accepted||state.completed)return;
 try{if(!("wakeLock" in navigator))throw Error("Niet ondersteund");wake=await navigator.wakeLock.request("screen");$("ei-wake").textContent="Scherm actief houden: actief";wake.addEventListener("release",()=>{wake=null;$("ei-wake").textContent="Scherm actief houden: niet actief";});}
 catch(e){$("ei-wake").textContent="WAARSCHUWING: scherm kan uitschakelen ("+e.message+")";}
 }
 document.querySelectorAll(".ei-choice").forEach(c=>c.addEventListener("change",()=>{state.selected=Array.from(document.querySelectorAll(".ei-choice:checked")).map(x=>x.value);save();}));
 $("ei-accept").addEventListener("click",()=>{if(!state.selected.length){alert("Selecteer minimaal één EI.");return;}if(!db){alert("Lokale opslag is niet beschikbaar. Aannemen is geblokkeerd.");return;}state.accepted=true;render();save();requestWake();});
+$("ei-completed").addEventListener("change",e=>{if(e.target.checked&&!confirm("Markeer deze EI als afgehandeld? De registratie blijft bewaard.")){e.target.checked=false;return;}state.completed=e.target.checked;state.completedAt=state.completed?new Date().toISOString():null;if(state.completed){wake?.release();wake=null;}else requestWake();save();render();if(navigator.onLine)saveChain.then(sync);});
 $("ei-back").addEventListener("click",()=>{state.accepted=false;wake?.release();wake=null;render();save();});
 for(const [id,key] of [["ei-id","identification"],["ei-date","date"],["ei-time","time"]])$(id).addEventListener("input",e=>{state[key]=e.target.value;save();});
 function connectivity(){$("ei-connectivity").textContent=navigator.onLine?"Online — controleer synchronisatiestatus":"Offline — concept uitsluitend lokaal opgeslagen";}
@@ -79,7 +83,7 @@ async function sync(){
 }
 $("ei-sync").addEventListener("click",sync);
 window.addEventListener("online",()=>{connectivity();sync();});window.addEventListener("offline",connectivity);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.accepted&&!wake)requestWake();});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.accepted&&!state.completed&&!wake)requestWake();});
 window.addEventListener("beforeunload",()=>{if(state.accepted)return;});
-(async()=>{try{const response=await fetch("/static/ei-schema.json");if(!response.ok)throw Error("Schema niet beschikbaar");SCHEMA=await response.json();}catch(e){$("ei-storage").textContent="WAARSCHUWING: EI-formulieren niet geladen";return;}try{db=await openDb();const saved=await transact("readonly",s=>s.get(draftKey));if(saved)Object.assign(state,saved);state.recordId ||= crypto.randomUUID();state.revision ||= 0;state.syncedRevision ||= 0;state.checks ||= {};state.details ||= {};render();$("ei-storage").textContent="Lokale conceptopslag gereed";if(state.accepted)requestWake();if(navigator.onLine)sync();}catch(e){$("ei-storage").textContent="WAARSCHUWING: IndexedDB niet beschikbaar — geen betrouwbare opslag";render();}connectivity();})();
+(async()=>{try{const response=await fetch("/static/ei-schema.json");if(!response.ok)throw Error("Schema niet beschikbaar");SCHEMA=await response.json();}catch(e){$("ei-storage").textContent="WAARSCHUWING: EI-formulieren niet geladen";return;}try{db=await openDb();const saved=await transact("readonly",s=>s.get(draftKey));if(saved)Object.assign(state,saved);state.recordId ||= crypto.randomUUID();state.revision ||= 0;state.syncedRevision ||= 0;state.checks ||= {};state.details ||= {};render();$("ei-storage").textContent="Lokale conceptopslag gereed";if(state.accepted&&!state.completed)requestWake();if(navigator.onLine)sync();}catch(e){$("ei-storage").textContent="WAARSCHUWING: IndexedDB niet beschikbaar — geen betrouwbare opslag";render();}connectivity();})();
 })();

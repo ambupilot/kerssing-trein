@@ -1,4 +1,4 @@
-const CACHE="kerssing-ei-v1";
+const CACHE="kerssing-ei-v2";
 const STATIC=["/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js","/static/ei-logout.js"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(async cache=>{await cache.addAll(STATIC);await self.skipWaiting();}));});
 self.addEventListener("activate",event=>{event.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith("kerssing-ei-")&&key!==CACHE)await caches.delete(key);await self.clients.claim();})());});
@@ -10,6 +10,6 @@ if(url.pathname==="/ei/new"){
 event.respondWith((async()=>{try{const response=await fetch(request);if(response.ok&&response.headers.get("content-type")?.includes("text/html")){const cache=await caches.open(CACHE);await cache.put(request,response.clone());}return response;}catch(e){return (await caches.match(request))||Response.error();}})());return;
 }
 if(STATIC.includes(url.pathname)){
-event.respondWith((async()=>{const cached=await caches.match(request);if(cached)return cached;return fetch(request);})());
+event.respondWith((async()=>{try{const response=await fetch(request);if(response.ok){const cache=await caches.open(CACHE);await cache.put(request,response.clone());}return response;}catch(e){return (await caches.match(request))||Response.error();}})());
 }
 });

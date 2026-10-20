@@ -7,6 +7,7 @@
   <title>{% block title %}Kerssing Trein{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='ei-logout.js') }}"></script>
 </head>
 <body>
   <header class="topbar">
@@ -14,7 +15,7 @@
       <a class="brand" href="{{ url_for('week') }}">Kerssing Trein</a>
       {% if current_user.is_authenticated %}<a href="{{ url_for('ei_new') }}">European Instructions (test)</a>{% endif %}
       {% if current_user.is_authenticated %}
-      <form method="post" action="{{ url_for('logout') }}" data-submit-lock>
+      <form method="post" action="{{ url_for('logout') }}" data-submit-lock id="logout-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="link-button" type="submit">Uitloggen</button>
       </form>

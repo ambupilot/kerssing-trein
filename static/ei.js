@@ -29,6 +29,34 @@ if(state.accepted) for(const num of state.selected){
 const def=SCHEMA[num];if(!def)continue;
 const card=document.createElement("section");card.className="ei-card";card.style.background=def.color;card.dataset.type=num;
 const h=document.createElement("h3");h.className="ei-card-title";h.textContent=(Number(num)>8?"x.":"")+num+" "+def.title;card.append(h);
+if(num==="1"){
+ card.classList.add("ei-one");
+ const titleCheckbox=document.createElement("input");titleCheckbox.type="checkbox";titleCheckbox.className="ei-main-check";titleCheckbox.checked=true;titleCheckbox.disabled=true;titleCheckbox.setAttribute("aria-label","EI 1 geselecteerd");
+ h.prepend(titleCheckbox);
+ const lines=[
+ ["1.10","heeft toestemming om EOA of stoptonend sein of SMB te passeren",1],
+ ["1.20","doorrijden in SH",2],
+ ["x.25","hoeft niet op zicht te rijden",2]
+ ];
+ for(const [code,description,indent] of lines){
+  const row=document.createElement("div");row.className="ei-one-row ei-one-indent-"+indent;
+  const label=document.createElement("label");label.className="ei-one-choice";
+  const cb=document.createElement("input");cb.type="checkbox";cb.className="ei-check";cb.checked=!!(state.checks["1"]||{})[code];
+  cb.addEventListener("change",()=>{(state.checks["1"]??={})[code]=cb.checked;save();});
+  const words=document.createElement("span");
+  const number=document.createElement("span");number.className="ei-one-code";number.textContent=code+" ";
+  words.append(number,document.createTextNode(description));label.append(cb,words);row.append(label);
+  if(code==="1.10"){
+   const location=document.createElement("label");location.className="ei-one-location";
+   const input=document.createElement("input");input.type="text";input.className="ei-field-input";input.value=(state.details["1"]||{}).location||"";
+   input.setAttribute("aria-label","km 1.11.1 / sein 1.11.2");input.placeholder="km 1.11.1 / sein 1.11.2";
+   input.addEventListener("input",()=>{(state.details["1"]??={}).location=input.value;save();});
+   location.append(input);row.append(location);
+  }
+  card.append(row);
+ }
+ root.append(card);continue;
+}
 for(const [code,description] of def.checks){
 const label=document.createElement("label");label.className="ei-check-row";
 const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!(state.checks[num]||{})[code];cb.className="ei-check";

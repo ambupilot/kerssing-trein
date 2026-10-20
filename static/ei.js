@@ -12,13 +12,15 @@ const TYPES = [
 const $=id=>document.getElementById(id);
 let SCHEMA={};
 const state={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:""};
-let db, wake=null, saveChain=Promise.resolve();
+let db, wake=null, saveChain=Promise.resolve(), syncBusy=false;
+const draftKey="current";
 const now=new Date(), local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();
 state.date=local.slice(0,10);state.time=local.slice(11,16);
 function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open("kerssing-ei",1);req.onupgradeneeded=()=>req.result.createObjectStore("drafts");req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function transact(mode,fn){return new Promise((resolve,reject)=>{const tx=db.transaction("drafts",mode),req=fn(tx.objectStore("drafts"));req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function snapshot(){return JSON.parse(JSON.stringify(state));}
-function save(){const data=snapshot();$("ei-storage").textContent="Lokaal opslaan…";saveChain=saveChain.catch(()=>{}).then(()=>transact("readwrite",s=>s.put(data,"current"))).then(()=>$("ei-storage").textContent="Lokaal opgeslagen om "+new Date().toLocaleTimeString("nl-NL"),()=>$("ei-storage").textContent="WAARSCHUWING: lokaal opslaan mislukt");}
+function markDirty(){state.revision=(state.revision||0)+1;state.syncedRevision=state.syncedRevision||0;}
+function save(){markDirty();const data=snapshot();$("ei-storage").textContent="Lokaal opslaan…";saveChain=saveChain.catch(()=>{}).then(()=>transact("readwrite",s=>s.put(data,draftKey))).then(()=>$("ei-storage").textContent="Lokaal opgeslagen om "+new Date().toLocaleTimeString("nl-NL"),()=>$("ei-storage").textContent="WAARSCHUWING: lokaal opslaan mislukt");}
 function render(){
 $("ei-selection").hidden=state.accepted;$("ei-selected").hidden=!state.accepted;
 document.querySelectorAll(".ei-choice").forEach(c=>c.checked=state.selected.includes(c.value));
@@ -46,7 +48,6 @@ label.append(span,field);card.append(label);
 root.append(card);
 }
 }
-}
 async function requestWake(){
 if(!state.accepted)return;
 try{if(!("wakeLock" in navigator))throw Error("Niet ondersteund");wake=await navigator.wakeLock.request("screen");$("ei-wake").textContent="Scherm actief houden: actief";wake.addEventListener("release",()=>{wake=null;$("ei-wake").textContent="Scherm actief houden: niet actief";});}
@@ -56,9 +57,29 @@ document.querySelectorAll(".ei-choice").forEach(c=>c.addEventListener("change",(
 $("ei-accept").addEventListener("click",()=>{if(!state.selected.length){alert("Selecteer minimaal één EI.");return;}if(!db){alert("Lokale opslag is niet beschikbaar. Aannemen is geblokkeerd.");return;}state.accepted=true;render();save();requestWake();});
 $("ei-back").addEventListener("click",()=>{state.accepted=false;wake?.release();wake=null;render();save();});
 for(const [id,key] of [["ei-id","identification"],["ei-date","date"],["ei-time","time"]])$(id).addEventListener("input",e=>{state[key]=e.target.value;save();});
-function connectivity(){$("ei-connectivity").textContent=navigator.onLine?"Online — concept lokaal opgeslagen; geen serversynchronisatie":"Offline — concept uitsluitend lokaal opgeslagen";}
-window.addEventListener("online",connectivity);window.addEventListener("offline",connectivity);
+function connectivity(){$("ei-connectivity").textContent=navigator.onLine?"Online — controleer synchronisatiestatus":"Offline — concept uitsluitend lokaal opgeslagen";}
+async function sync(){
+ if(syncBusy||!db||!navigator.onLine)return;
+ syncBusy=true;
+ try{
+  await saveChain;
+  const data=await transact("readonly",store=>store.get(draftKey));
+  if(!data||!data.accepted||!data.identification||!data.date||!data.time||!data.selected.length){$("ei-sync-status").textContent="Vul eerst identificatie, datum, tijd en EI-selectie in.";return;}
+  if(data.syncedRevision===data.revision){$("ei-sync-status").textContent="Reeds gesynchroniseerd.";return;}
+  $("ei-sync-status").textContent="Synchroniseren…";
+  const response=await fetch("/api/ei/sync",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":$("ei-csrf").value},credentials:"same-origin",body:JSON.stringify(data)});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  const receipt=await response.json();
+  await saveChain;
+  const latest=await transact("readonly",store=>store.get(draftKey));
+  if(latest&&latest.recordId===data.recordId){latest.syncedRevision=Math.max(latest.syncedRevision||0,data.revision);await transact("readwrite",store=>store.put(latest,draftKey));state.syncedRevision=latest.syncedRevision;}
+  $("ei-sync-status").textContent="Server bevestigd: versie "+receipt.revision+" om "+new Date().toLocaleTimeString("nl-NL");
+ }catch(e){$("ei-sync-status").textContent="Niet gesynchroniseerd — lokaal behouden ("+e.message+")";}
+ finally{syncBusy=false;}
+}
+$("ei-sync").addEventListener("click",sync);
+window.addEventListener("online",()=>{connectivity();sync();});window.addEventListener("offline",connectivity);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.accepted&&!wake)requestWake();});
 window.addEventListener("beforeunload",()=>{if(state.accepted)return;});
-(async()=>{try{const response=await fetch(document.currentScript?.dataset?.schema||"/static/ei-schema.json");if(!response.ok)throw Error("Schema niet beschikbaar");SCHEMA=await response.json();}catch(e){$("ei-storage").textContent="WAARSCHUWING: EI-formulieren niet geladen";return;}try{db=await openDb();const saved=await transact("readonly",s=>s.get("current"));if(saved)Object.assign(state,saved);state.checks ||= {};state.details ||= {};render();$("ei-storage").textContent="Lokale conceptopslag gereed";if(state.accepted)requestWake();}catch(e){$("ei-storage").textContent="WAARSCHUWING: IndexedDB niet beschikbaar — geen betrouwbare opslag";render();}connectivity();})();
+(async()=>{try{const response=await fetch("/static/ei-schema.json");if(!response.ok)throw Error("Schema niet beschikbaar");SCHEMA=await response.json();}catch(e){$("ei-storage").textContent="WAARSCHUWING: EI-formulieren niet geladen";return;}try{db=await openDb();const saved=await transact("readonly",s=>s.get(draftKey));if(saved)Object.assign(state,saved);state.recordId ||= crypto.randomUUID();state.revision ||= 0;state.syncedRevision ||= 0;state.checks ||= {};state.details ||= {};render();$("ei-storage").textContent="Lokale conceptopslag gereed";if(state.accepted)requestWake();if(navigator.onLine)sync();}catch(e){$("ei-storage").textContent="WAARSCHUWING: IndexedDB niet beschikbaar — geen betrouwbare opslag";render();}connectivity();})();
 })();

@@ -57,9 +57,55 @@ if(num==="1"){
  }
  root.append(card);continue;
 }
+
+if(num==="5"||num==="6"||num==="8"){
+ card.classList.add("ei-layout-special");
+ const addField=(key,hint,required=true)=>{
+  const input=document.createElement("input");input.type="text";input.className="ei-special-input"+(required?" ei-special-required":"");
+  input.placeholder=hint;input.setAttribute("aria-label",hint);input.value=(state.details[num]||{})[key]||"";
+  input.addEventListener("input",()=>{(state.details[num]??={})[key]=input.value;save();});return input;
+ };
+ const addCheck=(code,labelText,mandatory=false)=>{
+  const label=document.createElement("label");label.className="ei-special-check";
+  const cb=document.createElement("input");cb.type="checkbox";cb.className="ei-check";
+  cb.checked=mandatory?true:!!(state.checks[num]||{})[code];cb.disabled=mandatory;
+  if(mandatory){cb.classList.add("ei-fixed-cross");cb.setAttribute("aria-label","Verplicht voorgedrukt kruisje");}
+  else cb.addEventListener("change",()=>{(state.checks[num]??={})[code]=cb.checked;save();});
+  const text=document.createElement("span");const codeSpan=document.createElement("span");codeSpan.className="ei-one-code";codeSpan.textContent=code+" ";
+  text.append(codeSpan,document.createTextNode(labelText));label.append(cb,text);card.append(label);
+ };
+ const addLocations=()=>{
+  for(const [left,leftKey,leftHint,right,rightKey,rightHint] of [
+   ["tussen/ op*","between","locatie x.43","en","and","locatie x.44"],
+   ["van/ bij*","from","km x.47.1 / sein x.47.2","tot","to","km x.48.1 / sein x.48.2"]
+  ].slice(0,num==="8"?1:2)){
+   const row=document.createElement("div");row.className="ei-special-location-row";
+   for(const [label,key,hint,required] of [[left,leftKey,leftHint,true],[right,rightKey,rightHint,false]]){
+    const group=document.createElement("label");group.className="ei-special-location";
+    const caption=document.createElement("span");caption.textContent=label;group.append(caption,addField(key,hint,required));row.append(group);
+   }card.append(row);
+  }
+ };
+ if(num==="5"||num==="6"){
+  const line=document.createElement("div");line.className="ei-special-speed";
+  const label=document.createElement("label");label.className="ei-special-check";
+  const cb=document.createElement("input");cb.type="checkbox";cb.className="ei-check";
+  cb.checked=!!(state.checks[num]||{})["x.41"];cb.addEventListener("change",()=>{(state.checks[num]??={})["x.41"]=cb.checked;save();});
+  const words=document.createElement("span");words.innerHTML='<span class="ei-one-code">x.41</span> de maximumsnelheid beperken tot';
+  label.append(cb,words);line.append(label,addField("speed","km/h x.42.1"));card.append(line);addLocations();
+ }else{
+  addCheck("8.40","houdt rekening met defecte overweg(en)");addLocations();
+  addCheck("8.50","voor de overweg(en)");
+  const grid=document.createElement("div");grid.className="ei-crossing-grid";
+  for(let i=1;i<=9;i++)grid.append(addField("km"+i,"km 8."+(50+i),i===1));card.append(grid);
+  addCheck("8.60","bij het naderen van de overweg(en), beperken van de maximumsnelheid tot 10 km/h",true);
+  addCheck("8.80","bij het naderen van de overweg(en), geeft u fluitsignalen",true);
+ }
+ root.append(card);continue;
+}
 for(const [code,description] of def.checks){
 const label=document.createElement("label");label.className="ei-check-row";
-const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!(state.checks[num]||{})[code];cb.className="ei-check";
+const cb=document.createElement("input");cb.type="checkbox";cb.checked=(num==="7"&&code==="7.23")?true:!!(state.checks[num]||{})[code];cb.className="ei-check";if(num==="7"&&code==="7.23"){cb.disabled=true;cb.classList.add("ei-fixed-cross");}
 cb.addEventListener("change",()=>{(state.checks[num]??={})[code]=cb.checked;save();});
 const span=document.createElement("span");span.textContent=code+" "+description;label.append(cb,span);card.append(label);
 }

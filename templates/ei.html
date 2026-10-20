@@ -9,7 +9,7 @@
 <h1>European Instructions</h1>
 <p class="ei-note"><strong>Ontwikkelversie — niet voor operationeel gebruik.</strong> De officiële subvelden en procedure moeten nog worden gevalideerd. Gebruik de voorgeschreven spoorwegprocedure.</p>
 <input type="hidden" id="ei-csrf" value="{{ csrf_token() }}">
-<div id="ei-connectivity" class="ei-status" role="status"></div>
+<div id="ei-connectivity" class="ei-status" role="status"></div><div id="ei-draft-status" class="ei-status">Selecteer een instructie om te beginnen.</div>
 <div id="ei-selection">
 <p>Selecteer één of meer instructies:</p>
 <div class="ei-options">
@@ -19,8 +19,8 @@
 </div>
 <div class="ei-actions"><button type="button" id="ei-accept" class="button">Aannemen</button></div>
 </div>
-<div id="ei-selected" hidden><div class="ei-paper"><div class="ei-paper-heading">European Instruction</div><div id="ei-forms"></div></div><p class="ei-paper-footer">* Doorhalen wat niet van toepassing is. Ontwikkelversie: uitsluitend het machinistgedeelte.</p><div id="ei-completed-box" class="ei-completion" hidden><label><input id="ei-completed" type="checkbox"> Deze EI is afgehandeld</label><div id="ei-completed-at" class="ei-status">Nog niet afgehandeld</div></div><button type="button" id="ei-back" class="button secondary">Selectie wijzigen</button></div>
-<section class="ei-ident" aria-label="Verplichte identificatie">
+<div id="ei-selected" hidden><div class="ei-paper"><div class="ei-paper-heading">European Instruction</div><div id="ei-forms"></div></div><p class="ei-paper-footer">* Doorhalen wat niet van toepassing is. Ontwikkelversie: uitsluitend het machinistgedeelte.</p><div id="ei-completed-box" class="ei-completion" hidden><label><input id="ei-completed" type="checkbox"> Deze EI is afgehandeld</label><div id="ei-completed-at" class="ei-status">Nog niet afgehandeld</div></div><button type="button" id="ei-back" class="button secondary">Selectie wijzigen</button> <button type="button" id="ei-new" class="button" hidden>Nieuwe EI starten</button></div>
+<section class="ei-ident" id="ei-identification" aria-label="Verplichte identificatie" hidden>
 <strong>Identificatie (verplicht)</strong>
 <div class="ei-ident-grid">
 <label>Identificatienummer<input id="ei-id" autocomplete="off" required></label>
@@ -36,6 +36,6 @@
 </section>
 <script defer src="{{ url_for('static', filename='ei.js') }}"></script>
 <script>
-if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v2"); if(navigator.onLine){const page=await fetch("/ei/new",{credentials:"same-origin"});if(page.ok&&page.headers.get("content-type")?.includes("text/html"))await cache.put("/ei/new",page.clone());}const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v3"); if(navigator.onLine){const page=await fetch("/ei/new",{credentials:"same-origin"});if(page.ok&&page.headers.get("content-type")?.includes("text/html"))await cache.put("/ei/new",page.clone());}const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
 </script>
 {% endblock %}

@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from ei_archive import build_ei_pdf
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for, jsonify, make_response
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
@@ -289,6 +290,63 @@ def create_app() -> Flask:
                 conn.execute("INSERT INTO ei_snapshots (record_id, revision, owner_id, payload, received_at) VALUES (?, ?, ?, ?, ?)",
                              (record_id, revision, int(current_user.id), encoded, now_iso()))
         return jsonify(status="stored", record_id=record_id, revision=revision)
+
+    @app.post("/api/ei/archive")
+    @login_required
+    def ei_archive():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(error="Ongeldige aanvraag"), 400
+        record_id = data.get("recordId")
+        revision = data.get("revision")
+        if not isinstance(record_id, str) or type(revision) is not int:
+            return jsonify(error="Ongeldige registratie"), 400
+        try:
+            uuid.UUID(record_id)
+        except (ValueError, AttributeError):
+            return jsonify(error="Ongeldige registratie"), 400
+        with db_connection() as conn:
+            row = conn.execute(
+                "SELECT payload FROM ei_snapshots WHERE record_id=? AND revision=? AND owner_id=?",
+                (record_id, revision, int(current_user.id)),
+            ).fetchone()
+            if row is None:
+                return jsonify(error="Synchroniseer eerst deze versie van de EI"), 409
+            payload = json.loads(row["payload"])
+            if payload.get("completed") is not True or not payload.get("completedAt"):
+                return jsonify(error="EI is nog niet afgehandeld"), 409
+            try:
+                service_day = date.fromisoformat(payload["date"])
+            except (KeyError, ValueError, TypeError):
+                return jsonify(error="Ongeldige dienstdatum"), 400
+            filename = f"european_instruction-{record_id}-r{revision}.pdf"
+            directory = day_archive_dir(service_day)
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / filename
+            if not path.is_file():
+                pdf = build_ei_pdf(payload)
+                temporary = directory / (filename + ".tmp")
+                temporary.write_bytes(pdf)
+                temporary.replace(path)
+            timestamp = now_iso()
+            conn.execute(
+                """INSERT OR IGNORE INTO duties
+                   (service_date, service_number, start_time, end_time,
+                    overrun_minutes, not_worked, notes, created_at, updated_at)
+                   VALUES (?, '', NULL, NULL, 0, 0, '', ?, ?)""",
+                (service_day.isoformat(), timestamp, timestamp),
+            )
+            duty = conn.execute("SELECT id FROM duties WHERE service_date=?", (service_day.isoformat(),)).fetchone()
+            existing = conn.execute("SELECT id FROM attachments WHERE duty_id=? AND filename=?",
+                                    (duty["id"], filename)).fetchone()
+            if existing is None:
+                conn.execute(
+                    """INSERT INTO attachments (duty_id, category, filename, original_name, created_at)
+                       VALUES (?, 'european_instruction', ?, ?, ?)""",
+                    (duty["id"], filename, filename, timestamp),
+                )
+        return jsonify(status="archived", date=service_day.isoformat(),
+                       day_url=url_for("day", service_date=service_day.isoformat()))
 
     @app.get("/ei/offline")
     @login_required

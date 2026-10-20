@@ -7,6 +7,7 @@
 <section class="ei-page">
 <h1>European Instructions</h1>
 <p class="ei-note"><strong>Ontwikkelversie — niet voor operationeel gebruik.</strong> De officiële subvelden en procedure moeten nog worden gevalideerd. Gebruik de voorgeschreven spoorwegprocedure.</p>
+<input type="hidden" id="ei-csrf" value="{{ csrf_token() }}">
 <div id="ei-connectivity" class="ei-status" role="status"></div>
 <div id="ei-selection">
 <p>Selecteer één of meer instructies:</p>
@@ -25,9 +26,15 @@
 <label>Datum<input id="ei-date" type="date" required></label>
 <label>Tijd<input id="ei-time" type="time" required></label>
 </div>
+<button type="button" id="ei-sync" class="button secondary">Synchroniseer met server</button>
+<div id="ei-sync-status" class="ei-status" role="status">Nog niet gesynchroniseerd</div>
+<div id="ei-offline-ready" class="ei-status" role="status">Offlinebestanden controleren…</div>
 <div id="ei-storage" class="ei-status" role="status">Lokaal opslaan voorbereiden…</div>
 <div id="ei-wake" class="ei-status" role="status">Scherm actief houden: nog niet aangevraagd</div>
 </section>
 </section>
 <script defer src="{{ url_for('static', filename='ei.js') }}"></script>
+<script>
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v1"); const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
+</script>
 {% endblock %}

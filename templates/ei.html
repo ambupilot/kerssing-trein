@@ -41,6 +41,7 @@ textarea.ei-paper-textarea{min-height:85px}
 .ei-action-new{background:#238b38!important;border-color:#1b752e!important;color:#fff!important}
 .ei-action-new:hover,.ei-action-new:focus-visible{background:#196b2a!important}
 @media(max-width:650px){.ei-bottom-actions{gap:12px;margin-top:22px;margin-bottom:48px}}
+.ei-actions{margin:24px 0 38px}.ei-action-accept{background:#238b38!important;border-color:#1b752e!important;color:#fff!important;font-size:19px!important;font-weight:800!important;min-height:56px!important;padding:15px 38px!important;border-radius:9px!important}.ei-action-accept:hover,.ei-action-accept:focus-visible{background:#196b2a!important}
 </style>
 <section class="ei-page">
 <h1>European Instructions</h1>
@@ -54,7 +55,7 @@ textarea.ei-paper-textarea{min-height:85px}
 <label class="ei-option" style="background:{{ color }}"><input type="checkbox" value="{{ number }}" class="ei-choice"><strong>EI {{ number }}</strong><span>{{ label }}</span></label>
 {% endfor %}
 </div>
-<div class="ei-actions"><button type="button" id="ei-accept" class="button">Aannemen</button></div>
+<div class="ei-actions"><button type="button" id="ei-accept" class="button ei-action-accept">Aannemen</button></div>
 </div>
 <div id="ei-selected" hidden><div class="ei-paper"><div class="ei-paper-heading">European Instruction</div><div id="ei-forms"></div></div><p class="ei-paper-footer">* Doorhalen wat niet van toepassing is. Ontwikkelversie: uitsluitend het machinistgedeelte.</p><div id="ei-completed-box" class="ei-completion" hidden><label><input id="ei-completed" type="checkbox"> Deze EI is afgehandeld</label><div id="ei-completed-at" class="ei-status">Nog niet afgehandeld</div><button type="button" id="ei-archive" class="button secondary" hidden>PDF archiveren bij dagstaat</button><div id="ei-archive-status" class="ei-status" role="status"></div><a id="ei-day-link" class="button secondary" hidden>Open dagstaat</a></div><div class="ei-bottom-actions"><button type="button" id="ei-back" class="button ei-action-edit">EI wijzigen</button><button type="button" id="ei-new" class="button ei-action-new" hidden>Nieuwe EI starten</button></div></div>
 <section class="ei-ident" id="ei-identification" aria-label="Verplichte identificatie" hidden>

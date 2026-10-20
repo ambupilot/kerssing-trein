@@ -35,6 +35,6 @@
 </section>
 <script defer src="{{ url_for('static', filename='ei.js') }}"></script>
 <script>
-if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v1"); const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/ei-sw.js", {scope:"/"}).then(async () => { const paths=["/ei/new","/static/ei.js","/static/ei-schema.json","/static/style.css","/static/app.js"]; const cache=await caches.open("kerssing-ei-v1"); if(navigator.onLine){const page=await fetch("/ei/new",{credentials:"same-origin"});if(page.ok&&page.headers.get("content-type")?.includes("text/html"))await cache.put("/ei/new",page.clone());}const ready=await Promise.all(paths.map(p=>cache.match(p))); document.getElementById("ei-offline-ready").textContent=ready.every(Boolean)?"Offlinebestanden beschikbaar op dit apparaat":"Offline nog niet gereed: open deze pagina online opnieuw."; }).catch(()=>document.getElementById("ei-offline-ready").textContent="Offlinevoorziening niet beschikbaar"); }
 </script>
 {% endblock %}

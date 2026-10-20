@@ -168,5 +168,5 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #98a2b3; outline-
 }
 
 /* Centered EI action in the top navigation */
-.topbar .ei-top-link{background:#e98a22;color:#fff;border:1px solid #d47816;padding:10px 17px;min-height:42px;font-weight:750;white-space:nowrap}
-.topbar .ei-top-link:hover,.topbar .ei-top-link:focus-visible{background:#cc7010;color:#fff}
+.topbar .ei-top-link{background:#F5B3B4;color:#431b1b;border:1px solid #d98c8e;padding:10px 17px;min-height:42px;font-weight:750;white-space:nowrap}
+.topbar .ei-top-link:hover,.topbar .ei-top-link:focus-visible{background:#e89b9d;color:#431b1b}

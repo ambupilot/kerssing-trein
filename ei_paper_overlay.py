@@ -136,12 +136,6 @@ def build_ei_pdf(payload):
     # Identification goes in the official identification box; no right-hand
     # train-dispatcher fields or signatures are fabricated.
     fill((690, 69, 905, 90), payload.get("identification", ""))
-    # Date and time are printed in the administrative footer, outside EI fields.
-    c.setFillColorRGB(0.2, 0.2, 0.2)
-    c.setFont("Helvetica", 7*sx)
-    c.drawString(*position(20, 1438),
-                 ("Archief: " + str(payload.get("date", "")) + " " +
-                  str(payload.get("time", "")))[:65])
     c.save()
     overlay.seek(0)
     writer = PdfWriter()

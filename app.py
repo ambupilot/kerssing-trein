@@ -239,6 +239,13 @@ def create_app() -> Flask:
         flash("De geselecteerde bestanden zijn samen te groot. Kies kleinere bestanden of upload ze in delen.", "error")
         return redirect(request.referrer or url_for("week"))
 
+    @app.get("/ei-sw.js")
+    def ei_service_worker():
+        response = send_file(BASE_DIR / "static" / "ei-sw.js", mimetype="application/javascript")
+        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.post("/api/ei/sync")
     @login_required
     def ei_sync():

@@ -1,0 +1,285 @@
+{
+  "1": {
+    "title": "Toestemming een EOA/stoptonend sein te passeren",
+    "color": "#F5B3B4",
+    "checks": [
+      [
+        "1.10",
+        "heeft toestemming om EOA of stoptonend sein of SMB te passeren"
+      ],
+      [
+        "1.20",
+        "doorrijden in SH"
+      ],
+      [
+        "x.25",
+        "hoeft niet op zicht te rijden"
+      ]
+    ],
+    "fields": [
+      [
+        "location",
+        "km 1.11.1 / sein 1.11.2",
+        "text"
+      ]
+    ]
+  },
+  "2": {
+    "title": "Toestemming tot doorrijden na TRIP",
+    "color": "#D2D4D4",
+    "checks": [
+      [
+        "2.10",
+        "heeft toestemming om door te rijden in SR, als er geen MA is ontvangen"
+      ],
+      [
+        "2.11",
+        "heeft toestemming om door te rijden in SH"
+      ]
+    ],
+    "fields": []
+  },
+  "3": {
+    "title": "Verplichting om stil te blijven staan",
+    "color": "#EDD0E0",
+    "checks": [
+      [
+        "3.10",
+        "op de huidige locatie"
+      ],
+      [
+        "3.20",
+        "beschikbare MA verwijderen"
+      ]
+    ],
+    "fields": []
+  },
+  "4": {
+    "title": "Intrekking van een instructie",
+    "color": "#FFF0BD",
+    "checks": [
+      [
+        "4.10",
+        "de Operational Instruction met ID is ingetrokken"
+      ]
+    ],
+    "fields": [
+      [
+        "instruction_id",
+        "ID 4.11",
+        "text"
+      ]
+    ]
+  },
+  "5": {
+    "title": "Verplichting om de snelheid te beperken",
+    "color": "#AFD2EB",
+    "checks": [
+      [
+        "x.41",
+        "de maximumsnelheid beperken tot"
+      ]
+    ],
+    "fields": [
+      [
+        "speed",
+        "km/h x.42.1",
+        "number"
+      ],
+      [
+        "between",
+        "locatie x.43 (tussen/op)",
+        "text"
+      ],
+      [
+        "and",
+        "locatie x.44 (en)",
+        "text"
+      ],
+      [
+        "from",
+        "km x.47.1 / sein x.47.2 (van/bij)",
+        "text"
+      ],
+      [
+        "to",
+        "km x.48.1 / sein x.48.2 (tot)",
+        "text"
+      ]
+    ]
+  },
+  "6": {
+    "title": "Verplichting om te rijden op zicht",
+    "color": "#F5F09B",
+    "checks": [
+      [
+        "x.41",
+        "de maximumsnelheid beperken tot"
+      ]
+    ],
+    "fields": [
+      [
+        "speed",
+        "km/h x.42.1",
+        "number"
+      ],
+      [
+        "between",
+        "locatie x.43 (tussen/op)",
+        "text"
+      ],
+      [
+        "and",
+        "locatie x.44 (en)",
+        "text"
+      ],
+      [
+        "from",
+        "km x.47.1 / sein x.47.2 (van/bij)",
+        "text"
+      ],
+      [
+        "to",
+        "km x.48.1 / sein x.48.2 (tot)",
+        "text"
+      ]
+    ]
+  },
+  "7": {
+    "title": "Toestemming om te vertrekken",
+    "color": "#D2D4D4",
+    "checks": [
+      [
+        "7.10",
+        "heeft toestemming om te vertrekken in SR"
+      ],
+      [
+        "7.11",
+        "heeft toestemming om te vertrekken in SH"
+      ],
+      [
+        "7.20",
+        "heeft toestemming om EOA/SMB te passeren"
+      ],
+      [
+        "7.23",
+        "het is verboden om override EOA te gebruiken"
+      ]
+    ],
+    "fields": [
+      [
+        "signal",
+        "7.21 sein",
+        "text"
+      ]
+    ]
+  },
+  "8": {
+    "title": "Toestemming om een defecte overweg te passeren",
+    "color": "#F8C4A7",
+    "checks": [
+      [
+        "8.40",
+        "houdt rekening met defecte overweg(en)"
+      ],
+      [
+        "8.50",
+        "voor de overweg(en)"
+      ],
+      [
+        "8.60",
+        "bij het naderen van de overweg(en), beperken van de maximumsnelheid tot 10 km/h"
+      ],
+      [
+        "8.80",
+        "bij het naderen van de overweg(en), geeft u fluitsignalen"
+      ]
+    ],
+    "fields": [
+      [
+        "between",
+        "locatie x.43 (tussen/op)",
+        "text"
+      ],
+      [
+        "and",
+        "locatie x.44 (en)",
+        "text"
+      ],
+      [
+        "km1",
+        "km 8.51",
+        "text"
+      ],
+      [
+        "km2",
+        "km 8.52",
+        "text"
+      ],
+      [
+        "km3",
+        "km 8.53",
+        "text"
+      ],
+      [
+        "km4",
+        "km 8.54",
+        "text"
+      ],
+      [
+        "km5",
+        "km 8.55",
+        "text"
+      ],
+      [
+        "km6",
+        "km 8.56",
+        "text"
+      ],
+      [
+        "km7",
+        "km 8.57",
+        "text"
+      ],
+      [
+        "km8",
+        "km 8.58",
+        "text"
+      ],
+      [
+        "km9",
+        "km 8.59",
+        "text"
+      ]
+    ]
+  },
+  "90": {
+    "title": "Controleren van de infrastructuur",
+    "color": "#B8DDB4",
+    "checks": [],
+    "fields": [
+      [
+        "reason",
+        "x.91 Reden van controle",
+        "textarea"
+      ],
+      [
+        "report",
+        "x.92 Meld bevindingen aan",
+        "textarea"
+      ]
+    ]
+  },
+  "95": {
+    "title": "Aanvullende opdracht",
+    "color": "#E1E1E1",
+    "checks": [],
+    "fields": [
+      [
+        "instruction",
+        "x.96 Aanvullende opdracht",
+        "textarea"
+      ]
+    ]
+  }
+}

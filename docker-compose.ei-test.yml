@@ -1,0 +1,14 @@
+services:
+  trein-ei-test:
+    build: .
+    container_name: kerssing-trein-ei-test
+    restart: unless-stopped
+    env_file:
+      - .env.ei-test
+    environment:
+      DATA_DIR: /app/data
+      SESSION_COOKIE_SECURE: "true"
+    volumes:
+      - ./data-ei-test:/app/data
+    ports:
+      - "127.0.0.1:8091:8000"

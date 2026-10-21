@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import json
+import re
 import os
 import sqlite3
 import uuid
@@ -9,8 +11,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from ei_paper_overlay import build_ei_pdf
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for, jsonify, make_response
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from reportlab.lib import colors
@@ -71,6 +74,16 @@ def init_db() -> None:
     with db_connection() as conn:
         conn.executescript(
             """
+            CREATE TABLE IF NOT EXISTS ei_snapshots (
+                record_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                owner_id INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                received_at TEXT NOT NULL,
+                PRIMARY KEY(record_id, revision),
+                FOREIGN KEY(owner_id) REFERENCES users(id)
+            );
+
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -226,6 +239,138 @@ def create_app() -> Flask:
     def payload_too_large(_error):
         flash("De geselecteerde bestanden zijn samen te groot. Kies kleinere bestanden of upload ze in delen.", "error")
         return redirect(request.referrer or url_for("week"))
+
+    @app.get("/ei-sw.js")
+    def ei_service_worker():
+        response = send_file(BASE_DIR / "static" / "ei-sw.js", mimetype="application/javascript")
+        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+    @app.post("/api/ei/sync")
+    @login_required
+    def ei_sync():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(error="Ongeldige JSON"), 400
+        record_id = payload.get("recordId")
+        revision = payload.get("revision")
+        selected = payload.get("selected")
+        if not isinstance(record_id, str) or not re.fullmatch(r"[0-9a-fA-F-]{36}", record_id):
+            return jsonify(error="Ongeldige registratie-ID"), 400
+        try:
+            uuid.UUID(record_id)
+        except ValueError:
+            return jsonify(error="Ongeldige registratie-ID"), 400
+        if type(revision) is not int or revision < 1 or revision > 100000000:
+            return jsonify(error="Ongeldige revisie"), 400
+        if not isinstance(selected, list) or not selected or len(selected) > 10 or any(str(n) not in {str(i) for i in range(1, 9)} | {"90", "95"} for n in selected):
+            return jsonify(error="Ongeldige EI-selectie"), 400
+        if not isinstance(payload.get("identification"), str) or not 0 < len(payload["identification"].strip()) <= 120:
+            return jsonify(error="Identificatienummer ontbreekt"), 400
+        try:
+            date.fromisoformat(payload["date"])
+            datetime.strptime(payload["time"], "%H:%M")
+        except (KeyError, TypeError, ValueError):
+            return jsonify(error="Datum of tijd ongeldig"), 400
+        if not isinstance(payload.get("details"), dict) or not isinstance(payload.get("checks"), dict):
+            return jsonify(error="Formuliervelden ongeldig"), 400
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        if len(encoded.encode("utf-8")) > 100000:
+            return jsonify(error="Registratie te groot"), 413
+        with db_connection() as conn:
+            owner = conn.execute("SELECT owner_id FROM ei_snapshots WHERE record_id = ? LIMIT 1", (record_id,)).fetchone()
+            if owner and owner["owner_id"] != int(current_user.id):
+                return jsonify(error="Registratie behoort aan andere gebruiker"), 403
+            existing = conn.execute("SELECT payload FROM ei_snapshots WHERE record_id = ? AND revision = ?", (record_id, revision)).fetchone()
+            if existing:
+                if existing["payload"] != encoded:
+                    return jsonify(error="Revisieconflict: lokale gegevens behouden"), 409
+            else:
+                conn.execute("INSERT INTO ei_snapshots (record_id, revision, owner_id, payload, received_at) VALUES (?, ?, ?, ?, ?)",
+                             (record_id, revision, int(current_user.id), encoded, now_iso()))
+        return jsonify(status="stored", record_id=record_id, revision=revision)
+
+    @app.post("/api/ei/archive")
+    @login_required
+    def ei_archive():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(error="Ongeldige aanvraag"), 400
+        record_id = data.get("recordId")
+        revision = data.get("revision")
+        if not isinstance(record_id, str) or type(revision) is not int:
+            return jsonify(error="Ongeldige registratie"), 400
+        try:
+            uuid.UUID(record_id)
+        except (ValueError, AttributeError):
+            return jsonify(error="Ongeldige registratie"), 400
+        with db_connection() as conn:
+            row = conn.execute(
+                "SELECT payload FROM ei_snapshots WHERE record_id=? AND revision=? AND owner_id=?",
+                (record_id, revision, int(current_user.id)),
+            ).fetchone()
+            if row is None:
+                return jsonify(error="Synchroniseer eerst deze versie van de EI"), 409
+            payload = json.loads(row["payload"])
+            if payload.get("completed") is not True or not payload.get("completedAt"):
+                return jsonify(error="EI is nog niet afgehandeld"), 409
+            try:
+                service_day = date.fromisoformat(payload["date"])
+            except (KeyError, ValueError, TypeError):
+                return jsonify(error="Ongeldige dienstdatum"), 400
+            filename = f"european_instruction-{record_id}-r{revision}.pdf"
+            directory = day_archive_dir(service_day)
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / filename
+            if not path.is_file():
+                pdf = build_ei_pdf(payload)
+                temporary = directory / (filename + ".tmp")
+                temporary.write_bytes(pdf)
+                temporary.replace(path)
+            timestamp = now_iso()
+            conn.execute(
+                """INSERT OR IGNORE INTO duties
+                   (service_date, service_number, start_time, end_time,
+                    overrun_minutes, not_worked, notes, created_at, updated_at)
+                   VALUES (?, '', NULL, NULL, 0, 0, '', ?, ?)""",
+                (service_day.isoformat(), timestamp, timestamp),
+            )
+            duty = conn.execute("SELECT id FROM duties WHERE service_date=?", (service_day.isoformat(),)).fetchone()
+            existing = conn.execute("SELECT id FROM attachments WHERE duty_id=? AND filename=?",
+                                    (duty["id"], filename)).fetchone()
+            if existing is None:
+                conn.execute(
+                    """INSERT INTO attachments (duty_id, category, filename, original_name, created_at)
+                       VALUES (?, 'european_instruction', ?, ?, ?)""",
+                    (duty["id"], filename, filename, timestamp),
+                )
+        return jsonify(status="archived", date=service_day.isoformat(),
+                       day_url=url_for("day", service_date=service_day.isoformat()))
+
+    @app.get("/ei/offline")
+    @login_required
+    def ei_offline_page():
+        response = make_response(redirect(url_for("ei_new")))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/ei/new")
+    @login_required
+    def ei_new():
+        ei_types = [
+            (1, "Toestemming een EOA/stoptonend sein te passeren", "#F5B3B4"),
+            (2, "Toestemming tot doorrijden na TRIP", "#D2D4D4"),
+            (3, "Verplichting om stil te blijven staan", "#EDD0E0"),
+            (4, "Intrekking van een instructie", "#FFF0BD"),
+            (5, "Verplichting om de snelheid te beperken", "#AFD2EB"),
+            (6, "Verplichting om te rijden op zicht", "#F5F09B"),
+            (7, "Toestemming om te vertrekken", "#D2D4D4"),
+            (8, "Toestemming om een defecte overweg te passeren", "#F8C4A7"),
+            (90, "Controleren van de infrastructuur", "#B8DDB4"),
+            (95, "Aanvullende opdracht", "#E1E1E1"),
+        ]
+        return render_template("ei.html", ei_types=ei_types)
 
     @app.route("/health")
     def health():

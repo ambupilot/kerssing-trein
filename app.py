@@ -460,31 +460,7 @@ def create_app() -> Flask:
             next_week=next_iso.week,
         )
 
-    @app.get("/week/<int:iso_year>/<int:iso_week>/zip")
-    @login_required
-    def week_zip(iso_year: int, iso_week: int):
-        iso_year, iso_week = safe_week(iso_year, iso_week)
-        week_dir = ARCHIVE_DIR / str(iso_year) / f"{iso_week:02d}"
-
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            if week_dir.is_dir():
-                for path in sorted(week_dir.rglob("*")):
-                    if path.is_file():
-                        archive.write(path, arcname=path.relative_to(week_dir))
-        buffer.seek(0)
-
-        return send_file(
-            buffer,
-            mimetype="application/zip",
-            as_attachment=True,
-            download_name=f"{iso_year}-{iso_week:02d}.zip",
-        )
-
-    @app.get("/week/<int:iso_year>/<int:iso_week>/pdf")
-    @login_required
-    def week_pdf(iso_year: int, iso_week: int):
-        iso_year, iso_week = safe_week(iso_year, iso_week)
+    def build_week_pdf_bytes(iso_year: int, iso_week: int):
         monday, sunday = week_bounds(iso_year, iso_week)
 
         with db_connection() as conn:
@@ -657,10 +633,38 @@ def create_app() -> Flask:
         ))
 
         doc.build(story)
+        return buffer.getvalue()
+
+
+    @app.get("/week/<int:iso_year>/<int:iso_week>/zip")
+    @login_required
+    def week_zip(iso_year: int, iso_week: int):
+        iso_year, iso_week = safe_week(iso_year, iso_week)
+        week_dir = ARCHIVE_DIR / str(iso_year) / f"{iso_week:02d}"
+        filename = f"{iso_year}-{iso_week:02d}.pdf"
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            if week_dir.is_dir():
+                for path in sorted(week_dir.rglob("*")):
+                    if path.is_file() and path.relative_to(week_dir).as_posix() != filename:
+                        archive.write(path, arcname=path.relative_to(week_dir))
+            archive.writestr(filename, build_week_pdf_bytes(iso_year, iso_week))
         buffer.seek(0)
 
         return send_file(
             buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"{iso_year}-{iso_week:02d}.zip",
+        )
+
+    @app.get("/week/<int:iso_year>/<int:iso_week>/pdf")
+    @login_required
+    def week_pdf(iso_year: int, iso_week: int):
+        iso_year, iso_week = safe_week(iso_year, iso_week)
+        return send_file(
+            io.BytesIO(build_week_pdf_bytes(iso_year, iso_week)),
             mimetype="application/pdf",
             as_attachment=True,
             download_name=f"{iso_year}-{iso_week:02d}.pdf",

@@ -70,7 +70,7 @@ def build_ei_pdf(payload):
         txt(x+24,top-20,("x."+n if n in ("90","95") else "EI "+n)+"  "+title,8,True)
         return top-34
     def check(x,y,n,code,label,fixed=False):
-        tick(x,y-2, bool((checks.get(n) or {}).get(code)) and n in selected,fixed and n in selected)
+        tick(x,y-2, bool((checks.get(n) or {}).get(code)) and n in selected,fixed)
         txt(x+13,y,label,6.6)
     def d(n,key):
         return (details.get(n) or {}).get(key,"") if n in selected else ""
@@ -134,7 +134,7 @@ def build_ei_pdf(payload):
         rr,cc=divmod(i,3)
         value(R+34+cc*116,v-49-rr*24,108,19,"8."+str(51+i)+" km",d("8","km"+str(i+1)),i==0)
     check(R+34,v-125,"8","8.60","Bij naderen overweg(en): max. 10 km/h",True)
-    check(R+34,v-142,"8","8.80","Bij naderen overweg(en): fluitsignalen",True)
+    check(R+34,v-142,"8","8.70","Bij naderen overweg(en): fluitsignalen",True)
     y-=186
     v=section(R,y,"90","Controleren infrastructuur",100)
     value(R+25,v+9,CW-50,44,"x.91 Reden van controle",d("90","reason"),True,True)

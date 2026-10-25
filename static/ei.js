@@ -11,7 +11,7 @@ const TYPES = [
 ["8","Toestemming om een defecte overweg te passeren","#F8C4A7"]];
 const $=id=>document.getElementById(id);
 let SCHEMA={};
-const state={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null};
+const state={selected:[],details:{},checks:{},accepted:false,trainNumber:"",dispatcherArea:"",identification:"",date:"",time:"",completed:false,completedAt:null};
 let db, wake=null, saveChain=Promise.resolve(), syncBusy=false, archiveBusy=false;
 const draftKey="current";
 function currentLocalDateTime(){const now=new Date(), local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();return {date:local.slice(0,10),time:local.slice(11,16)};}
@@ -23,7 +23,7 @@ function save(){markDirty();const data=snapshot();$("ei-storage").textContent="L
 function render(){
 $("ei-selection").hidden=state.accepted;$("ei-selected").hidden=!state.accepted;$("ei-identification").hidden=!state.accepted;$("ei-draft-status").hidden=state.accepted;
 document.querySelectorAll(".ei-choice").forEach(c=>c.checked=state.selected.includes(c.value));
-$("ei-id").value=state.identification;$("ei-date").value=state.date;$("ei-time").value=state.time;
+$("ei-train-number").value=state.trainNumber||"";$("ei-dispatcher-area").value=state.dispatcherArea||"";$("ei-id").value=state.identification;$("ei-date").value=state.date;$("ei-time").value=state.time;
 const root=$("ei-forms");root.replaceChildren();
 if(state.accepted) for(const num of state.selected){
 const def=SCHEMA[num];if(!def)continue;
@@ -179,7 +179,7 @@ $("ei-accept").addEventListener("click",()=>{if(!state.selected.length){alert("S
 $("ei-completed").addEventListener("change",e=>{if(e.target.checked&&!confirm("Markeer deze EI als afgehandeld? De registratie blijft bewaard.")){e.target.checked=false;return;}state.completed=e.target.checked;state.completedAt=state.completed?new Date().toISOString():null;if(state.completed){wake?.release();wake=null;}else requestWake();save();render();if(navigator.onLine)saveChain.then(sync);});
 $("ei-back").addEventListener("click",()=>{state.accepted=false;wake?.release();wake=null;render();save();});
 $("ei-new").addEventListener("click",()=>{if(!state.completed){alert("Markeer de huidige EI eerst als afgehandeld voordat je een nieuwe start.");return;}if(state.archivedRevision!==state.revision){alert("Archiveer de afgehandelde EI eerst op de server voordat je een nieuwe EI start.");return;}if(!confirm("Nieuwe EI starten? De identificatie en ingevulde velden worden leeggemaakt."))return;const fresh={selected:[],details:{},checks:{},accepted:false,identification:"",date:"",time:"",completed:false,completedAt:null,recordId:crypto.randomUUID(),revision:0,syncedRevision:0,archivedRevision:0};Object.assign(state,fresh);wake?.release();wake=null;render();save();$("ei-sync-status").textContent="Nieuwe EI — nog niet gesynchroniseerd";});
-for(const [id,key] of [["ei-id","identification"],["ei-date","date"],["ei-time","time"]])$(id).addEventListener("input",e=>{state[key]=e.target.value;save();});
+for(const [id,key] of [["ei-train-number","trainNumber"],["ei-dispatcher-area","dispatcherArea"],["ei-id","identification"],["ei-date","date"],["ei-time","time"]])$(id).addEventListener("input",e=>{state[key]=e.target.value;save();});
 function connectivity(){$("ei-connectivity").textContent=navigator.onLine?"Online — controleer synchronisatiestatus":"Offline — concept uitsluitend lokaal opgeslagen";}
 async function sync(){
  if(syncBusy||!db||!navigator.onLine)return;
@@ -187,7 +187,7 @@ async function sync(){
  try{
   await saveChain;
   const data=await transact("readonly",store=>store.get(draftKey));
-  if(!data||!data.accepted||!data.identification||!data.date||!data.time||!data.selected.length){$("ei-sync-status").textContent="Vul eerst identificatie, datum, tijd en EI-selectie in.";return;}
+  if(!data||!data.accepted||!data.trainNumber||!data.dispatcherArea||!data.identification||!data.date||!data.time||!data.selected.length){$("ei-sync-status").textContent="Vul eerst treinnummer, treindienstleidergebied, identificatie, datum, tijd en EI-selectie in.";return;}
   if(data.syncedRevision===data.revision){$("ei-sync-status").textContent="Reeds gesynchroniseerd.";return;}
   $("ei-sync-status").textContent="Synchroniseren…";
   const response=await fetch("/api/ei/sync",{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":$("ei-csrf").value},credentials:"same-origin",body:JSON.stringify(data)});

@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from ei_paper_overlay import build_ei_pdf
+from ei_a4_archive import build_ei_pdf
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for, jsonify, make_response
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user

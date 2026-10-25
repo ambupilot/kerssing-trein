@@ -41,6 +41,18 @@ def build_ei_pdf(payload):
         rect(x,top-h,w,h,"#FFFFFF",red)
         txt(x+4,top-7,label,5.4)
         raw=str(val or "").replace("\\r","").strip()
+        if h<=20:
+            if not raw:return
+            caption_width=stringWidth(label,"Helvetica",5.4)
+            room=w-caption_width-13
+            size=7.5
+            while size>=5 and stringWidth(raw,"Helvetica",size)>room:
+                size-=.5
+            if room<=0 or stringWidth(raw,"Helvetica",size)>room:
+                raise ValueError("Tekst past niet in veld "+label)
+            c.setFillColor(BLACK);c.setFont("Helvetica",size)
+            c.drawRightString(x+w-4,top-11.5,raw)
+            return
         if not raw:return
         lines=[]
         font=9 if h>=20 else 7.5
@@ -104,14 +116,14 @@ def build_ei_pdf(payload):
         v=section(M,y,n,title,105)
         check(M+34,v,n,"x.41","Maximumsnelheid beperken tot")
         value(M+268,v+10,109,18,"x.42.1 km/h",d(n,"speed"),True)
-        txt(M+100,v-28,"tussen / op*",6.7)
-        value(M+182,v-15,96,18,"x.43 locatie",d(n,"between"),True)
-        txt(M+283,v-28,"en",6.7)
-        value(M+306,v-15,71,18,"x.44 locatie",d(n,"and"))
-        txt(M+100,v-52,"van / bij*",6.7)
-        value(M+182,v-39,96,18,"x.47 km/sein",d(n,"from"),True)
-        txt(M+283,v-52,"tot",6.7)
-        value(M+306,v-39,71,18,"x.48 km/sein",d(n,"to"))
+        txt(M+96,v-28,"tussen / op*",6.7)
+        value(M+168,v-15,107,18,"x.43 locatie",d(n,"between"),True)
+        txt(M+280,v-28,"en",6.7)
+        value(M+300,v-15,77,18,"x.44 locatie",d(n,"and"))
+        txt(M+96,v-52,"van / bij*",6.7)
+        value(M+168,v-39,107,18,"x.47 km/sein",d(n,"from"),True)
+        txt(M+280,v-52,"tot",6.7)
+        value(M+300,v-39,77,18,"x.48 km/sein",d(n,"to"))
         y-=110
     txt(M+5,y-7,"Aanvullende informatie (voetnoten)",6.7,True)
     txt(M+5,y-18,"* Doorhalen wat niet van toepassing is.",6.1)
